@@ -5,6 +5,11 @@ import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/fi
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
+// 🎯 사용자 지정 변수
+const APP_VERSION = "v0.02";
+const JSON_FILE_NAME = "sobang-v0.01.json"; 
+const IMAGE_BASE_PATH = "/image/"; 
+
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -31,10 +36,7 @@ let currentUser = null; // 현재 로그인한 사용자 정보
 let currentProblemIndex = 0; // 현재 풀고 있는 문제의 인덱스
 let isAnswered = false; // 현재 문제가 풀이되었는지 여부
 
-// 🎯 사용자 지정 변수
-const JSON_FILE_NAME = "sobang-v0.01.json"; 
-const IMAGE_BASE_PATH = "/image/"; 
-const STORAGE_KEY = 'SobangLevel2'; // 학습 내용(결과)을 저장할 로컬 저장소 키
+
 
 // DOM 요소
 const bookSelect = document.getElementById('book-select');
@@ -67,7 +69,13 @@ const logoutButton = document.getElementById('logout-button');
 // 🚀 초기화 및 이벤트 리스너
 // =========================================================================
 
-document.addEventListener('DOMContentLoaded', () => loadData(null)); // 페이지 로드 시 비로그인 상태로 데이터 로드
+// 앱 제목에 버전 표시
+const appTitle = document.querySelector('.app-header h1');
+if (appTitle) {
+    appTitle.textContent += `(${APP_VERSION})`;
+}
+
+// document.addEventListener('DOMContentLoaded', () => loadData(null)); // onAuthStateChanged가 모든 로딩을 처리하므로 이 줄은 제거합니다.
 loginIcon.addEventListener('click', () => window.location.href = 'login.html');
 settingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
 closeModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
@@ -109,10 +117,8 @@ onAuthStateChanged(auth, user => {
         loadData(currentUser.uid); // 사용자 ID로 데이터 로드
     } else {
         // 사용자가 로그아웃한 경우 (user 객체가 null)
-        currentUser = null;
-        userStatus.style.display = 'none';
-        loginIcon.style.display = 'inline-block';
-        loadData(null); // 비로그인 상태(로컬)로 데이터 로드
+        // 로그인 페이지로 리디렉션
+        window.location.href = 'login.html';
     }
 });
 // =========================================================================
@@ -359,11 +365,11 @@ function showPreviousResult(problem) {
     } else {
         resultMessage.className = 'incorrect';
         resultMessage.textContent = `❌ 이전에 오답 처리된 문제입니다. 정답은 ${correctAnswer}번입니다.`;
-        
-        imageB.src = IMAGE_BASE_PATH + problem.image_b;
-        imageB.alt = `${problem.book} 해설 ${problem.num}`;
-        imageB.style.display = 'block';
     }
+
+    imageB.src = IMAGE_BASE_PATH + problem.image_b;
+    imageB.alt = `${problem.book} 해설 ${problem.num}`;
+    imageB.style.display = 'block';
 
     resultContainer.style.display = 'block';
     nextButton.style.display = 'block';
