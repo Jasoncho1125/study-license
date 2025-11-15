@@ -6,8 +6,8 @@ import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/1
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // 🎯 사용자 지정 변수
-const APP_VERSION = "v0.03";
-const JSON_FILE_NAME = "sobang-v0.02.json"; 
+const APP_VERSION = "v0.04";
+const JSON_FILE_NAME = "sobang-v0.03.json"; 
 const IMAGE_BASE_PATH = "/image/"; 
 
 // Your web app's Firebase configuration
