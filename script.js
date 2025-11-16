@@ -6,7 +6,7 @@ import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/1
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // 🎯 사용자 지정 변수
-const APP_VERSION = "v0.05";
+const APP_VERSION = "v0.06";
 const JSON_FILE_NAME = "sobang-v0.03.json"; 
 const IMAGE_BASE_PATH = "/image/"; 
 
@@ -349,6 +349,9 @@ function displayProblem(index) {
 
     // 현재 위치를 Firebase에 저장
     if (currentUser) saveLastStateToFirebase(currentUser.uid);
+
+    // 문제 정보가 화면 상단에 오도록 스크롤
+    currentProblemInfo.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /**
@@ -665,7 +668,7 @@ function updateSolvedProblemsChart() {
 // =========================================================================
 let startX = 0;
 let endX = 0;
-const SWIPE_THRESHOLD = 50; 
+const SWIPE_THRESHOLD = 100; 
 
 // 모바일 터치 이벤트
 imageContainer.addEventListener('touchstart', (e) => {
