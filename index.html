@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>소방안전</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -72,6 +73,10 @@
 
         <section id="progress-summary-section">
             <h2>전체 학습 현황</h2>
+            <div id="chart-container" style="margin-bottom: 20px;">
+                <h3>최근 7일 풀이 현황</h3>
+                <canvas id="solved-problems-chart"></canvas>
+            </div>
             <div id="progress-summary-container">
                 <!-- 학습 현황이 여기에 동적으로 추가됩니다. -->
             </div>

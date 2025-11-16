@@ -151,7 +151,8 @@ function saveProgressToFirebase(userId) {
     const progressData = quizData.map(p => ({
         book: p.book,
         num: p.num,
-        testResult: p.testResult
+        testResult: p.testResult,
+        solvedAt: p.solvedAt || null // solvedAt 정보 추가
     })).filter(p => p.testResult !== null); // 푼 문제만 저장
 
     set(ref(db, `users/${userId}/progress`), progressData)
@@ -213,16 +214,20 @@ async function loadData(userId) {
         // JSON 데이터를 기본 템플릿으로 설정
         let mergedData = remoteData.map(problem => ({
             ...problem,
-            testResult: null // 기본값 초기화
+            testResult: null, // 기본값 초기화
+            solvedAt: null    // 시간 정보 필드 추가
         }));
 
         // Firebase 데이터와 병합
         if (userData && userData.progress) {
-            const userProgressMap = new Map(userData.progress.map(p => [`${p.book}-${p.num}`, p.testResult]));
+            // testResult와 solvedAt을 함께 가져오도록 수정
+            const userProgressMap = new Map(userData.progress.map(p => [`${p.book}-${p.num}`, { result: p.testResult, time: p.solvedAt }]));
             mergedData.forEach(problem => {
                 const key = `${problem.book}-${problem.num}`;
                 if (userProgressMap.has(key)) {
-                    problem.testResult = userProgressMap.get(key);
+                    const progress = userProgressMap.get(key);
+                    problem.testResult = progress.result;
+                    problem.solvedAt = progress.time;
                 }
             });
         }
@@ -233,6 +238,7 @@ async function loadData(userId) {
         
         setupBookSelector(quizData, lastState);
         updateProgressSummary(); // 학습 현황 업데이트
+        updateSolvedProblemsChart(); // 차트 업데이트
 
     } catch (error) {
         loadStatus.textContent = `❌ 데이터 로드 실패: ${error.message}. 파일 경로를 확인해주세요.`;
@@ -405,12 +411,14 @@ function checkAnswer(selectedButton) {
         message = `${userAnswer}번, 정답입니다. 🎉`;
         resultMessage.className = 'correct';
         problem.testResult = 'ok';
-        
     } else {
         message = `틀렸습니다. 정답은 ${correctAnswer}번입니다. 😥`;
         resultMessage.className = 'incorrect';
         problem.testResult = 'nok';
     }
+
+    // 정답/오답 여부와 관계없이 풀이 시간 기록
+    problem.solvedAt = Date.now();
     
     // 해설 이미지 표시
     imageB.src = IMAGE_BASE_PATH + problem.image_b;
@@ -443,6 +451,7 @@ function checkAnswer(selectedButton) {
 
     // 전체 학습 현황 업데이트
     updateProgressSummary();
+    updateSolvedProblemsChart(); // 차트 업데이트
 
     // 현재 Book의 모든 문제를 풀었는지 확인
     const allSolved = currentBookProblems.every(p => p.testResult !== null);
@@ -557,7 +566,7 @@ function updateProgressSummary() {
         const totalProblemCount = quizData.length;
         const completedProblemCount = quizData.filter(p => p.testResult !== null).length;
         const overallProgress = totalProblemCount > 0 ? Math.round((completedProblemCount / totalProblemCount) * 100) : 0;
-        summaryTitle.textContent = `전체 학습 현황 (${overallProgress}%)`;
+        summaryTitle.textContent = `전체 학습 현황 (총 ${totalProblemCount}개, ${overallProgress}%)`;
     }
 
 
@@ -582,6 +591,64 @@ function updateProgressSummary() {
     });
 }
 
+/**
+ * 11. 최근 7일간 푼 문제 수를 차트로 표시
+ */
+let myChart = null; // 차트 인스턴스를 저장할 변수
+function updateSolvedProblemsChart() {
+    if (!quizData || quizData.length === 0) return;
+
+    const solvedProblems = quizData.filter(p => p.solvedAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 오늘 날짜의 시작
+
+    const labels = [];
+    const data = [];
+
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+
+        const nextDate = new Date(date);
+        nextDate.setDate(date.getDate() + 1);
+
+        const count = solvedProblems.filter(p => {
+            const solvedDate = new Date(p.solvedAt);
+            return solvedDate >= date && solvedDate < nextDate;
+        }).length;
+
+        labels.push(`${date.getMonth() + 1}/${date.getDate()}`);
+        data.push(count);
+    }
+
+    const ctx = document.getElementById('solved-problems-chart').getContext('2d');
+
+    if (myChart) {
+        myChart.destroy(); // 기존 차트가 있으면 파괴
+    }
+
+    myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '일별 풀이 문제 수',
+                data: data,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 } // y축 단위를 1로 설정
+                }
+            }
+        }
+    });
+}
 
 
 // =========================================================================
