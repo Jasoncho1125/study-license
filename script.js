@@ -3,13 +3,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebas
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH } from './config.js';
 // https://firebase.google.com/docs/web/setup#available-libraries
-
-// 🎯 사용자 지정 변수
-const APP_NAME = "자격증 공부"
-const APP_VERSION = "v0.1";
-const JSON_FILE_NAME = "study_data-v0.1.json"; 
-const IMAGE_BASE_PATH = "/image/"; 
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional

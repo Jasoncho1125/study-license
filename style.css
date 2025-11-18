@@ -68,9 +68,9 @@ button:hover {
 .icon-button {
     background: none;
     border: none;
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
-    padding: 4px; /* 아이콘 주변의 내부 여백을 줄입니다. */
+    padding: 2px; /* 아이콘 주변의 내부 여백을 줄입니다. */
     margin: 0 2px; /* 아이콘 간의 외부 여백을 줄입니다. */
     vertical-align: middle; /* 아이콘들을 수직으로 정렬합니다. */
 }

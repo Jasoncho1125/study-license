@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+import { APP_NAME } from './config.js';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -19,6 +20,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+
+// 앱 제목 설정
+const authAppTitle = document.querySelector('.auth-box h1');
+if (authAppTitle) {
+    authAppTitle.textContent = APP_NAME;
+}
 
 // 공통 에러 메시지 DOM
 const errorMessage = document.getElementById('error-message');
