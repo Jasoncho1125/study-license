@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>소방안전</title>
+    <title>자격증공부</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -13,11 +13,12 @@
         <header class="app-header">
             <h1>소방안전관리자2급</h1>
             <div class="header-icons">
-                <div id="user-status" style="display: none;">
+                <div id="user-status" style="display: none; align-items: center;">
+                    <span id="user-display-name" class="user-name"></span>
                     <button id="logout-button" class="icon-button" title="로그아웃">📤</button>
                 </div>
                 <button id="login-icon" class="icon-button">👤</button>
-                <button id="settings-button" class="icon-button">⚙️</button>
+                <button id="settings-button" class="icon-button" title="설정">⚙️</button>
             </div>
         </header>
 
@@ -29,13 +30,18 @@
                 <div id="book-selector-container">
                     <label for="book-select">Book 선택:</label>
                     <select id="book-select"></select>
-                    <p id="total-problems-info"></p>
-                    <p id="local-storage-status" class="storage-info"></p>
                 </div>
+                <div id="chapter-selector-container" class="mb-3">
+                    <label for="chapter-select">Chapter 선택:</label>
+                    <br><select id="chapter-select" style="width: 100%; margin-top: 5px;"></select>
+                </div>
+
                 <hr>
+                <p id="total-problems-info"></p>
+                <p id="local-storage-status" class="storage-info"></p>
                 <div class="reset-options">
-                    <button id="reset-current-book-button">현재 Book 초기화</button>
-                    <button id="reset-all-button" class="danger">전체 초기화</button>
+                    <button id="reset-current-book-button">현재 Chapter 초기화</button>
+                    <button id="reset-all-button" class="danger">현재 Book 초기화</button>
                 </div>
                 <p id="load-status"></p>
                 <hr style="margin-top: 20px;">
@@ -43,14 +49,15 @@
             </div>
         </div>
 
-        <section id="quiz-section">
+        <section id="quiz-section" style="display: none;">
             <div class="quiz-header-container">
-                <button id="prev-book-button" class="nav-button">⬅️</button>
+                <button id="prev-chapter-button" class="nav-button">⬅️</button>
                 <h2 id="quiz-header"></h2>
-                <button id="next-book-button" class="nav-button">➡️</button>
+                <button id="next-chapter-button" class="nav-button">➡️</button>
             </div>
             <div id="problem-navigation">
                 <span id="current-problem-info"></span>
+                <button id="next-problem-top-button" class="nav-button-small" style="display: none;">다음 문제 ➡️</button>
             </div>
 
             <div id="image-container">
@@ -74,11 +81,11 @@
         </section>
 
         <section id="progress-summary-section">
-            <h2>전체 학습 현황</h2>
             <div id="chart-container" style="margin-bottom: 20px;">
                 <h3>최근 7일 풀이 현황</h3>
                 <canvas id="solved-problems-chart"></canvas>
             </div>
+            <h2>'Book' 학습 현황</h2>
             <div id="progress-summary-container">
                 <!-- 학습 현황이 여기에 동적으로 추가됩니다. -->
             </div>

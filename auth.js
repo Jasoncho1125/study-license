@@ -1,73 +1,124 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyCIGhIB4Ju-EriiODG6kryPG0L54OGKTRI",
-    authDomain: "sobanglevel2.firebaseapp.com",
-    projectId: "sobanglevel2",
-    storageBucket: "sobanglevel2.firebasestorage.app",
-    messagingSenderId: "1000021218348",
-    appId: "1:1000021218348:web:87881240640481caea6d89",
-    measurementId: "G-80TRB9F2KT",
-    databaseURL: "https://sobanglevel2-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    apiKey: "AIzaSyBWSckI_CyRmXxM-UJSmvECb6X2NK1FU4w",
+    authDomain: "study-licnese.firebaseapp.com",
+    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "study-licnese",
+    storageBucket: "study-licnese.firebasestorage.app",
+    messagingSenderId: "382526383688",
+    appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
+    measurementId: "G-24Z44XL77C",
+    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 
-const loginButton = document.getElementById('login-button');
-const signupButton = document.getElementById('signup-button');
+// 공통 에러 메시지 DOM
 const errorMessage = document.getElementById('error-message');
 
-if (loginButton) {
-    loginButton.addEventListener('click', handleLogin);
-}
+// =========================================================================
+// 👤 회원가입 관련 로직 (signup.html)
+// =========================================================================
+const signupNameInput = document.getElementById('signup-name');
+const signupEmailInput = document.getElementById('signup-email');
+const signupPasswordInput = document.getElementById('signup-password');
+const signupPasswordConfirmInput = document.getElementById('signup-password-confirm');
+const signupButton = document.getElementById('signup-button');
 
+// signupButton이 있는 페이지(signup.html)에서만 이벤트 리스너를 추가합니다.
 if (signupButton) {
-    signupButton.addEventListener('click', handleSignUp);
+    signupButton.addEventListener('click', async () => {
+        const name = signupNameInput.value;
+        const email = signupEmailInput.value;
+        const password = signupPasswordInput.value;
+        const passwordConfirm = signupPasswordConfirmInput.value;
+
+        errorMessage.textContent = ''; // 이전 오류 메시지 초기화
+
+        // 유효성 검사
+        if (!name || !email || !password || !passwordConfirm) {
+            errorMessage.textContent = '모든 필드를 입력해주세요.';
+            return;
+        }
+        if (password.length < 6) {
+            errorMessage.textContent = '비밀번호는 6자 이상이어야 합니다.';
+            return;
+        }
+        if (password !== passwordConfirm) {
+            errorMessage.textContent = '비밀번호가 일치하지 않습니다.';
+            return;
+        }
+
+        try {
+            // 1. Firebase Auth에 사용자 생성
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // 2. 사용자 프로필에 이름 업데이트
+            await updateProfile(user, {
+                displayName: name
+            });
+
+            // 3. Realtime Database에 사용자 정보 저장 (선택적)
+            await set(ref(db, 'users/' + user.uid), {
+                username: name,
+                email: email,
+                createdAt: Date.now()
+            });
+
+            alert('회원가입에 성공했습니다! 로그인 페이지로 이동합니다.');
+            window.location.href = 'login.html';
+
+        } catch (error) {
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage.textContent = '이미 사용 중인 이메일입니다.';
+            } else {
+                errorMessage.textContent = `회원가입 실패: ${error.message}`;
+            }
+            console.error("Signup Error:", error);
+        }
+    });
 }
 
-/**
- * 로그인 처리
- */
-async function handleLogin() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-    errorMessage.textContent = ''; // Clear previous error
-    try {
-        await signInWithEmailAndPassword(auth, email, password);
-        window.location.href = 'index.html'; // 로그인 성공 시 메인 페이지로 이동
-    } catch (error) {
-        console.error("로그인 오류:", error);
-        errorMessage.textContent = `로그인 실패: ${error.message}`;
-    }
-}
+// =========================================================================
+// 🔑 로그인 관련 로직 (login.html)
+// =========================================================================
+const loginEmailInput = document.getElementById('login-email');
+const loginPasswordInput = document.getElementById('login-password');
+const loginButton = document.getElementById('login-button');
 
-/**
- * 회원가입 처리
- */
-async function handleSignUp() {
-    const name = document.getElementById('signup-name').value;
-    const email = document.getElementById('signup-email').value;
-    const password = document.getElementById('signup-password').value;
-    const passwordConfirm = document.getElementById('signup-password-confirm').value;
-    errorMessage.textContent = ''; // Clear previous error
+// loginButton이 있는 페이지(login.html)에서만 이벤트 리스너를 추가합니다.
+if (loginButton) {
+    loginButton.addEventListener('click', async () => {
+        const email = loginEmailInput.value;
+        const password = loginPasswordInput.value;
+        errorMessage.textContent = '';
 
-    // 비밀번호 확인
-    if (password !== passwordConfirm) {
-        errorMessage.textContent = '비밀번호가 일치하지 않습니다.';
-        return;
-    }
+        if (!email || !password) {
+            errorMessage.textContent = '이메일과 비밀번호를 모두 입력해주세요.';
+            return;
+        }
 
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // 회원가입 성공 후, 사용자 프로필에 이름 업데이트
-        await updateProfile(userCredential.user, { displayName: name });
-        window.location.href = 'index.html'; // 회원가입 및 자동 로그인 성공 시 메인 페이지로 이동
-    } catch (error) {
-        console.error("회원가입 오류:", error);
-        errorMessage.textContent = `회원가입 실패: ${error.message}`;
-    }
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            // 로그인 성공 시 onAuthStateChanged가 감지하여 index.html로 보내주므로, 여기서는 별도 이동 처리가 필요 없습니다.
+            // 성공 알림 후 메인 페이지로 이동합니다.
+            alert('로그인 되었습니다.');
+            window.location.href = 'index.html';
+        } catch (error) {
+            console.error("Login Error:", error.code);
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                errorMessage.textContent = '등록되지 않은 계정이거나, 이메일 또는 비밀번호가 잘못되었습니다.';
+            } else {
+                errorMessage.textContent = `로그인 실패: ${error.message}`;
+            }
+        }
+    });
 }
