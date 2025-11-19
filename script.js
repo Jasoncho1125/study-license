@@ -17,7 +17,6 @@ const firebaseConfig = {
     messagingSenderId: "382526383688",
     appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
     measurementId: "G-24Z44XL77C",
-    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 
 // Initialize Firebase
@@ -351,6 +350,9 @@ function selectBook(book) {
 
     // UI 업데이트
     updateProgressSummary();
+
+    // Book을 변경하면 해당 Book의 첫번째 Chapter로 퀴즈를 바로 시작합니다.
+    startQuiz(false, 0, true);
 }
 
 /**

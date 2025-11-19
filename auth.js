@@ -12,8 +12,7 @@ const firebaseConfig = {
     storageBucket: "study-licnese.firebasestorage.app",
     messagingSenderId: "382526383688",
     appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
-    measurementId: "G-24Z44XL77C",
-    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    measurementId: "G-24Z44XL77C"
 };
 
 // Initialize Firebase
