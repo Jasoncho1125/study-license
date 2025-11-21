@@ -656,13 +656,6 @@ function memorizeProblem() {
         problem.solvedAt = Date.now();
 
         if (currentUser) saveProgressToFirebase(currentUser.uid);
-        updateProgressSummary();
-
-        // 암기 완료 후 Book/Chapter 목록의 카운트를 즉시 새로고침합니다.
-        const currentBook = bookSelect.value;
-        const currentChapter = chapterSelect.value; // 현재 챕터를 기억
-        selectBook(currentBook);
-        chapterSelect.value = currentChapter; // 기억했던 챕터를 다시 선택        
         
         // 현재 문제 목록에서 방금 암기한 문제를 제거합니다.
         currentBookProblems.splice(currentProblemIndex, 1);
@@ -671,6 +664,8 @@ function memorizeProblem() {
         if (currentBookProblems.length === 0) {
             alert("현재 Chapter의 모든 문제를 암기 완료했습니다!");
             document.getElementById('quiz-section').style.display = 'none';
+            // 퀴즈 종료 후 UI 통계 업데이트
+            selectBook(bookSelect.value); 
         } else if (currentProblemIndex >= currentBookProblems.length) {
             // 마지막 문제를 암기 완료한 경우, 첫 문제로 돌아갑니다.
             currentProblemIndex = 0;
@@ -679,6 +674,9 @@ function memorizeProblem() {
             // 그 외의 경우, 다음 문제를 표시합니다.
             displayProblem(currentProblemIndex);
         }
+
+        // 암기 완료 처리 후, 설정 창의 통계 정보도 즉시 업데이트합니다.
+        updateProgressSummary();
     }
 }
 
