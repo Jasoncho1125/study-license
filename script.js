@@ -45,7 +45,9 @@ const imageB = document.getElementById('image_b');
 const resultContainer = document.getElementById('result-container');
 const resultMessage = document.getElementById('result-message');
 const optionsContainer = document.getElementById('options-container');
+const explanationText = document.getElementById('explanation-text');
 const nextButton = document.getElementById('next-button');
+const memorizeButton = document.getElementById('memorize-button');
 const chapterSelect = document.getElementById('chapter-select'); // Chapter 드롭다운
 const quizHeader = document.getElementById('quiz-header');
 const currentProblemInfo = document.getElementById('current-problem-info');
@@ -61,6 +63,7 @@ const resetAllButton = document.getElementById('reset-all-button');
 const resetCurrentBookButton = document.getElementById('reset-current-book-button');
 const prevChapterButton = document.getElementById('prev-chapter-button');
 const nextChapterButton = document.getElementById('next-chapter-button');
+const includeMemorizedResetCheckbox = document.getElementById('include-memorized-reset');
 const nextProblemTopButton = document.getElementById('next-problem-top-button');
 const loginIcon = document.getElementById('login-icon');
 const userStatus = document.getElementById('user-status');
@@ -87,6 +90,7 @@ resetCurrentBookButton.addEventListener('click', resetCurrentBookLearning);
 prevChapterButton.addEventListener('click', prevChapter);
 nextChapterButton.addEventListener('click', nextChapter);
 nextProblemTopButton.addEventListener('click', nextProblem);
+memorizeButton.addEventListener('click', memorizeProblem);
 nextButton.addEventListener('click', nextProblem);
 chapterSelect.addEventListener('change', () => startQuiz()); // Chapter 선택 시 바로 퀴즈 시작
 bookSelect.addEventListener('change', () => selectBook(bookSelect.value));
@@ -143,6 +147,7 @@ async function loadFromFirebase(userId) {
     const snapshot = await get(dbRef);
     if (snapshot.exists()) {
         completionHistory = snapshot.val().completionHistory || {}; // 회독 정보 로드
+        // memorized 상태는 progress에 포함되어 로드됨
         return snapshot.val();
     }
     localStorageStatus.textContent = `⭐ 새로운 학습을 시작합니다.`;
@@ -158,7 +163,9 @@ function saveProgressToFirebase(userId) {
     const progressData = quizData.map(p => ({
         uid: p.uid,
         testResult: p.testResult,
-        solvedAt: p.solvedAt || null
+        solvedAt: p.solvedAt || null,
+        memorized: p.memorized || false,
+        attemptHistory: p.attemptHistory || []
     })).filter(p => p.testResult !== null); // 푼 문제만 저장
 
     set(ref(db, `users/${userId}/progress`), progressData)
@@ -248,17 +255,21 @@ async function loadData(userId) {
         // JSON 데이터를 기본 템플릿으로 설정
         let mergedData = remoteData.map(problem => ({
             ...problem,
-            testResult: null, // 기본값 초기화
+            testResult: null, // 기본값 초기화,
+            attemptHistory: [],
+            memorized: false,
             solvedAt: null    // 시간 정보 필드 추가
         }));
 
         // Firebase 데이터와 병합
         if (userData && userData.progress) {
-            const userProgressMap = new Map(userData.progress.map(p => [p.uid, { result: p.testResult, time: p.solvedAt }]));
+            const userProgressMap = new Map(userData.progress.map(p => [p.uid, { result: p.testResult, time: p.solvedAt, memorized: p.memorized, attemptHistory: p.attemptHistory }]));
             mergedData.forEach(problem => {
                 if (userProgressMap.has(problem.uid)) {
                     const progress = userProgressMap.get(problem.uid);
                     problem.testResult = progress.result;
+                    problem.attemptHistory = progress.attemptHistory || [];
+                    problem.memorized = progress.memorized || false;
                     problem.solvedAt = progress.time;
                 }
             });
@@ -296,9 +307,10 @@ function setupBookSelector(data, lastState = null) {
 
     bookList.forEach(bookName => {
         const problemCount = data.filter(p => p.book === bookName).length;
+        const memorizedCount = data.filter(p => p.book === bookName && p.memorized).length;
         const option = document.createElement('option');
         option.value = bookName;
-        option.textContent = `${bookName}(${problemCount}개)`;
+        option.textContent = `${bookName} (${problemCount}문제, ${memorizedCount}개 암기)`;
         bookSelect.appendChild(option);
     });
 
@@ -337,11 +349,12 @@ function selectBook(book) {
         const chapterProblems = quizData.filter(p => p.book === book && p.chapter === chapterName);
         const total = chapterProblems.length;
         const solved = chapterProblems.filter(p => p.testResult !== null).length;
+        const memorized = chapterProblems.filter(p => p.memorized).length;
         const progress = total > 0 ? Math.round((solved / total) * 100) : 0;
 
         const option = document.createElement('option');
         option.value = chapterName;
-        option.textContent = `${chapterName} (${solved}/${total}, ${progress}%)`;
+        option.textContent = `${chapterName} (${solved}/${total}, ${progress}%) [${memorized}개 암기]`;
         chapterSelect.appendChild(option);
     });
 
@@ -380,7 +393,7 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
     currentChapterIndex = chapterList.indexOf(selectedChapter);
 
     const selectedBook = bookSelect.value;
-    currentBookProblems = quizData.filter(p => p.book === selectedBook && p.chapter === selectedChapter);
+    currentBookProblems = quizData.filter(p => p.book === selectedBook && p.chapter === selectedChapter && !p.memorized);
 
     if (currentBookProblems.length === 0) {
         alert("선택하신 Chapter에 문제가 없습니다.");
@@ -423,8 +436,18 @@ function displayProblem(index) {
     const correctProblems = currentBookProblems.filter(p => p.testResult === 'ok').length;
     const correctRate = completedProblems > 0 ? Math.round((correctProblems / completedProblems) * 100) : 0;
 
+    // 현재 챕터의 암기된 문제 수 계산
+    const allProblemsInChapter = quizData.filter(p => p.book === bookSelect.value && p.chapter === chapterSelect.value);
+    const memorizedInChapterCount = allProblemsInChapter.filter(p => p.memorized).length;
+
+    // 문제 풀이 히스토리 생성 (예: 'XO')
+    let historyString = '';
+    if (problem.attemptHistory && problem.attemptHistory.length > 0) {
+        historyString = ', ' + problem.attemptHistory.map(res => res === 'ok' ? '<span style="color:blue;">⭕</span>' : '❌').join('');
+    }
+
     // 문제 정보 표시 (정답률 포함)
-    currentProblemInfo.innerHTML = `문제 ${currentProblemIndex + 1} / ${currentBookProblems.length} (정답률 ${correctRate}%)`;
+    currentProblemInfo.innerHTML = `문제 ${currentProblemIndex + 1} / ${currentBookProblems.length} (정답률 ${correctRate}%, 암기: ${memorizedInChapterCount})${historyString}`;
     
     // image_a 로드
     imageA.src = IMAGE_BASE_PATH + problem.image_a;
@@ -432,8 +455,10 @@ function displayProblem(index) {
     
     // 결과 및 해설 초기화
     resultContainer.style.display = 'none';
+    explanationText.style.display = 'none';
     imageB.style.display = 'none'; // 해설 이미지 숨기기
     nextButton.style.display = 'none';
+    memorizeButton.style.display = 'none';
     nextProblemTopButton.style.display = 'none';
     
     // 버튼 활성화 및 스타일 초기화
@@ -472,18 +497,26 @@ function showPreviousResult(problem) {
 
     if (problem.testResult === 'ok') {
         resultMessage.className = 'correct';
-        resultMessage.textContent = `✅ 이전에 정답(${correctAnswer}번) 처리된 문제입니다.`;
+        resultMessage.textContent = `✅ 이전에 정답(${correctAnswer.toString().split('').join(', ')}) 처리된 문제입니다.`;
     } else {
         resultMessage.className = 'incorrect';
-        resultMessage.textContent = `❌ 이전에 오답 처리된 문제입니다. 정답은 ${correctAnswer}번입니다.`;
+        resultMessage.textContent = `❌ 이전에 오답 처리된 문제입니다. 정답은 ${correctAnswer.toString().split('').join(', ')}번입니다.`;
     }
 
+    // 해설 텍스트 표시 (값이 있을 경우)
+    if (problem.explain) {
+        explanationText.innerHTML = problem.explain.replace(/\n/g, '<br>');
+        explanationText.style.display = 'block';
+    } else {
+        explanationText.style.display = 'none';
+    }
     imageB.src = IMAGE_BASE_PATH + problem.image_b;
     imageB.alt = `${problem.book} 해설 ${problem.num}`;
     imageB.style.display = 'block';
 
     resultContainer.style.display = 'block';
     nextButton.style.display = 'block';
+    memorizeButton.style.display = 'none'; // 이미 푼 문제는 암기완료 버튼 숨김
     nextProblemTopButton.style.display = 'block';
 }
 
@@ -504,7 +537,7 @@ function checkAnswer(selectedButton) {
     isAnswered = true;
     const problem = currentBookProblems[currentProblemIndex];
     const userAnswer = selectedButton.dataset.option;
-    const correctAnswer = problem.answer;
+    const correctAnswer = problem.answer.toString(); // Ensure answer is a string
     
     let message = '';
     
@@ -513,19 +546,35 @@ function checkAnswer(selectedButton) {
     });
 
     // 정답/오답 확인
-    if (userAnswer === correctAnswer) {
+    if (correctAnswer.includes(userAnswer)) {
         message = `${userAnswer}번, 정답입니다. 🎉`;
         resultMessage.className = 'correct';
+        if (!problem.attemptHistory) problem.attemptHistory = [];
+        problem.attemptHistory.push('ok');
+        memorizeButton.style.display = 'block';
+        nextButton.style.width = '49%'; // 원래 너비로
         problem.testResult = 'ok';
     } else {
-        message = `틀렸습니다. 정답은 ${correctAnswer}번입니다. 😥`;
+        message = `틀렸습니다. 정답은 ${correctAnswer.split('').join(', ')}번입니다. 😥`;
         resultMessage.className = 'incorrect';
+        if (!problem.attemptHistory) problem.attemptHistory = [];
+        problem.attemptHistory.push('nok');
+        memorizeButton.style.display = 'none'; // 오답일 때는 암기 완료 버튼 숨김
+        nextButton.style.width = '100%'; // 전체 너비로
         problem.testResult = 'nok';
     }
 
     // 정답/오답 여부와 관계없이 풀이 시간 기록
     problem.solvedAt = Date.now();
     
+    // 해설 텍스트 표시 (값이 있을 경우)
+    if (problem.explain) {
+        explanationText.innerHTML = problem.explain.replace(/\n/g, '<br>');
+        explanationText.style.display = 'block';
+    } else {
+        explanationText.style.display = 'none';
+    }
+
     // 해설 이미지 표시
     imageB.src = IMAGE_BASE_PATH + problem.image_b;
     imageB.alt = `${problem.book} 해설 ${problem.num}`;
@@ -536,10 +585,11 @@ function checkAnswer(selectedButton) {
         // 오답 선택 버튼 강조
         selectedButton.style.backgroundColor = 'red';
     }
-    const correctButton = document.querySelector(`.option-button[data-option="${correctAnswer}"]`);
-    if (correctButton) {
-        correctButton.style.backgroundColor = '#007bff'; // 정답은 파란색으로 변경
-    }
+    // 모든 정답 버튼을 파란색으로 변경
+    correctAnswer.split('').forEach(ans => {
+        const correctBtn = document.querySelector(`.option-button[data-option="${ans}"]`);
+        if (correctBtn) correctBtn.style.backgroundColor = '#007bff';
+    });
     
     resultMessage.textContent = message;
     resultContainer.style.display = 'block';
@@ -554,7 +604,18 @@ function checkAnswer(selectedButton) {
     const correctProblems = currentBookProblems.filter(p => p.testResult === 'ok').length;
     const correctRate = completedProblems > 0 ? Math.round((correctProblems / completedProblems) * 100) : 0;
 
-    currentProblemInfo.innerHTML = `문제 ${currentProblemIndex + 1} / ${currentBookProblems.length} (정답률 ${correctRate}%)`;
+    // 현재 챕터의 암기된 문제 수 계산
+    const allProblemsInChapter = quizData.filter(p => p.book === bookSelect.value && p.chapter === chapterSelect.value);
+    const memorizedInChapterCount = allProblemsInChapter.filter(p => p.memorized).length;
+
+    // 문제 풀이 히스토리 생성 (예: 'XO')
+    let historyString = '';
+    if (problem.attemptHistory && problem.attemptHistory.length > 0) {
+        historyString = ', ' + problem.attemptHistory.map(res => res === 'ok' ? '<span style="color:blue;">⭕</span>' : '❌').join('');
+    }
+
+    // 문제 정보 표시 (정답률 포함)
+    currentProblemInfo.innerHTML = `문제 ${currentProblemIndex + 1} / ${currentBookProblems.length} (정답률 ${correctRate}%, 암기: ${memorizedInChapterCount})${historyString}`;
 
     // 전체 학습 현황 업데이트
     updateProgressSummary();
@@ -581,6 +642,43 @@ function nextProblem() {
     } else {
         alert("마지막 문제입니다. 첫 문제로 돌아갑니다.");
         displayProblem(0);
+    }
+}
+
+/**
+ * 7-1. 암기 완료 처리
+ */
+function memorizeProblem() {
+    const problem = currentBookProblems[currentProblemIndex];
+    if (confirm("이 문제를 '암기 완료' 처리하시겠습니까?\n앞으로 이 Chapter에서는 출제되지 않습니다.")) {
+        problem.memorized = true;
+        problem.testResult = 'memorized'; // 상태를 'memorized'로 변경
+        problem.solvedAt = Date.now();
+
+        if (currentUser) saveProgressToFirebase(currentUser.uid);
+        updateProgressSummary();
+
+        // 암기 완료 후 Book/Chapter 목록의 카운트를 즉시 새로고침합니다.
+        const currentBook = bookSelect.value;
+        const currentChapter = chapterSelect.value; // 현재 챕터를 기억
+        selectBook(currentBook);
+        chapterSelect.value = currentChapter; // 기억했던 챕터를 다시 선택        
+        
+        // 현재 문제 목록에서 방금 암기한 문제를 제거합니다.
+        currentBookProblems.splice(currentProblemIndex, 1);
+
+        // 만약 남은 문제가 없다면, 퀴즈를 종료하고 알림을 표시합니다.
+        if (currentBookProblems.length === 0) {
+            alert("현재 Chapter의 모든 문제를 암기 완료했습니다!");
+            document.getElementById('quiz-section').style.display = 'none';
+        } else if (currentProblemIndex >= currentBookProblems.length) {
+            // 마지막 문제를 암기 완료한 경우, 첫 문제로 돌아갑니다.
+            currentProblemIndex = 0;
+            displayProblem(currentProblemIndex);
+        } else {
+            // 그 외의 경우, 다음 문제를 표시합니다.
+            displayProblem(currentProblemIndex);
+        }
     }
 }
 
@@ -633,6 +731,9 @@ function resetCurrentBookScope() {
             if (problem.book === currentBookName) {
                 problem.testResult = null;
                 problem.solvedAt = null;
+                if (includeMemorizedResetCheckbox.checked) {
+                    problem.memorized = false;
+                }
             }
         });
 
@@ -661,6 +762,9 @@ function resetCurrentBookLearning() {
             if (problem.book === currentBookName && problem.chapter === selectedChapter) {
                 problem.testResult = null;
                 problem.solvedAt = null;
+                if (includeMemorizedResetCheckbox.checked) {
+                    problem.memorized = false;
+                }
             }
         });
 
@@ -700,6 +804,7 @@ function updateProgressSummary() {
         const problemsInChapter = problemsInSelectedBook.filter(p => p.chapter === chapterName);
         const total = problemsInChapter.length;
         const solved = problemsInChapter.filter(p => p.testResult !== null).length;
+        const memorized = problemsInChapter.filter(p => p.memorized).length;
         const progress = total > 0 ? Math.round((solved / total) * 100) : 0;
 
         const progressParagraph = document.createElement('p');
@@ -714,7 +819,7 @@ function updateProgressSummary() {
             historyText = '[' + history.map(h => `${h.cycle}회독(${h.correct}/${h.total})`).join(', ') + ']';
         }
 
-        progressParagraph.innerHTML = `${chapterName}: ${solved}/${total} (${progress}%) ${historyText}`;
+        progressParagraph.innerHTML = `${chapterName}: ${solved}/${total} (${progress}%), 암기: ${memorized} ${historyText}`;
 
         // 현재 학습 중인 Chapter 강조
         if (chapterName === chapterSelect.value) {

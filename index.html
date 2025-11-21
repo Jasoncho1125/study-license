@@ -43,6 +43,9 @@
                     <button id="reset-current-book-button">현재 Chapter 초기화</button>
                     <button id="reset-all-button" class="danger">현재 Book 초기화</button>
                 </div>
+                <div class="reset-options" style="margin-top: 5px;">
+                    <label for="include-memorized-reset" style="font-size: 0.9em; cursor: pointer;"><input type="checkbox" id="include-memorized-reset"> 암기 완료 포함</label>
+                </div>
                 <p id="load-status"></p>
                 <hr style="margin-top: 20px;">
                 <button id="settings-close-button-bottom" style="width: 100%; background-color: #6c757d;">닫기</button>
@@ -74,10 +77,14 @@
 
             <div id="result-container" style="display:none;">
                 <p id="result-message"></p>
+                <p id="explanation-text"></p>
                 <img id="image_b" src="" alt="해설 이미지" style="display:none; max-width: 100%; height: auto;">
             </div>
             
-            <button id="next-button" style="display:none;">다음 문제 ➡️</button>
+            <div class="action-buttons">
+                <button id="memorize-button" style="display:none;">암기 완료 🧠</button>
+                <button id="next-button" style="display:none;">다음 문제 ➡️</button>
+            </div>
         </section>
 
         <section id="progress-summary-section">
