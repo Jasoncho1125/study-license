@@ -70,6 +70,7 @@ const userStatus = document.getElementById('user-status');
 const logoutButton = document.getElementById('logout-button');
 const userDisplayName = document.getElementById('user-display-name');
 const settingsCloseButtonBottom = document.getElementById('settings-close-button-bottom');
+let customModal, customModalMessage, customModalButtons, customModalOk, customModalConfirm, customModalCancel;
 
 // =========================================================================
 // 🚀 초기화 및 이벤트 리스너
@@ -81,7 +82,7 @@ if (appTitle) {
     appTitle.textContent = `${APP_NAME}(${APP_VERSION})`;
 }
 
-// document.addEventListener('DOMContentLoaded', () => loadData(null)); // onAuthStateChanged가 모든 로딩을 처리하므로 이 줄은 제거합니다.
+document.addEventListener('DOMContentLoaded', createCustomModal);
 loginIcon.addEventListener('click', () => window.location.href = 'login.html');
 settingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
 closeModalButton.addEventListener('click', () => settingsModal.style.display = 'none'); 
@@ -107,10 +108,10 @@ settingsCloseButtonBottom.addEventListener('click', () => settingsModal.style.di
 async function handleLogout() {
     try {
         await signOut(auth);
-        alert('로그아웃 되었습니다.');
+        customAlert('로그아웃 되었습니다.');
     } catch (error) {
         console.error("로그아웃 오류:", error);
-        alert(`로그아웃 실패: ${error.message}`);
+        customAlert(`로그아웃 실패: ${error.message}`);
     }
 }
 
@@ -377,7 +378,7 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
 
     if (!selectedChapter) {
         // 최초 로딩 시에는 alert을 띄우지 않고 조용히 종료
-        if (!fromNav && startIndex === null) alert("학습할 Chapter를 선택해주세요.");
+        if (!fromNav && startIndex === null) customAlert("학습할 Chapter를 선택해주세요.");
         return; 
     }
 
@@ -396,7 +397,7 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
     currentBookProblems = quizData.filter(p => p.book === selectedBook && p.chapter === selectedChapter && !p.memorized);
 
     if (currentBookProblems.length === 0) {
-        alert("선택하신 Chapter에 문제가 없습니다.");
+        customAlert("선택하신 Chapter에 문제가 없습니다.");
         return;
     }
 
@@ -452,6 +453,25 @@ function displayProblem(index) {
     // image_a 로드
     imageA.src = IMAGE_BASE_PATH + problem.image_a;
     imageA.alt = `${problem.book} 문제 ${problem.num}`;
+
+    // 이미지 파일명 표시 (image_a)
+    const imageAWrapper = imageA.parentElement;
+    imageAWrapper.style.position = 'relative';
+    let imageAFilename = document.getElementById('image-a-filename');
+    if (!imageAFilename) {
+        imageAFilename = document.createElement('small');
+        imageAFilename.id = 'image-a-filename';
+        imageAFilename.style.display = 'block';
+        imageAFilename.style.textAlign = 'center';
+        imageAFilename.style.marginTop = '2px';
+        imageAFilename.style.color = 'grey';
+        imageAFilename.style.padding = '2px 5px';
+        imageAFilename.style.borderRadius = '3px';
+        imageAFilename.style.fontSize = '0.85em';
+        imageA.insertAdjacentElement('afterend', imageAFilename);
+    }
+    imageAFilename.textContent = problem.image_a;
+    imageAFilename.style.display = 'block';
     
     // 결과 및 해설 초기화
     resultContainer.style.display = 'none';
@@ -459,6 +479,19 @@ function displayProblem(index) {
     imageB.style.display = 'none'; // 해설 이미지 숨기기
     nextButton.style.display = 'none';
     memorizeButton.style.display = 'none';
+
+    // 해설 이미지 파일명 숨기기
+    const imageBFilename = document.getElementById('image-b-filename');
+    if (imageBFilename) {
+        imageBFilename.style.display = 'none';
+    }
+    // 해설 이미지에 대한 wrapper position 속성 제거 (필요 시)
+    const imageBWrapper = imageB.parentElement;
+    if (imageBWrapper.style.position === 'relative') {
+        // imageA와 imageB가 같은 부모를 공유하므로, 여기서는 제거하지 않습니다.
+        // 만약 다른 부모를 가진다면 제거 로직이 필요합니다.
+    }
+
     nextProblemTopButton.style.display = 'none';
     
     // 버튼 활성화 및 스타일 초기화
@@ -513,6 +546,25 @@ function showPreviousResult(problem) {
     imageB.src = IMAGE_BASE_PATH + problem.image_b;
     imageB.alt = `${problem.book} 해설 ${problem.num}`;
     imageB.style.display = 'block';
+
+    // 해설 이미지 파일명 표시 (image_b)
+    const imageBWrapper = imageB.parentElement;
+    imageBWrapper.style.position = 'relative';
+    let imageBFilename = document.getElementById('image-b-filename');
+    if (!imageBFilename) {
+        imageBFilename = document.createElement('small');
+        imageBFilename.id = 'image-b-filename';
+        imageBFilename.style.display = 'block';
+        imageBFilename.style.textAlign = 'center';
+        imageBFilename.style.marginTop = '5px';
+        imageBFilename.style.color = 'grey';
+        imageBFilename.style.padding = '2px 5px';
+        imageBFilename.style.borderRadius = '3px';
+        imageBFilename.style.fontSize = '0.75em';
+        imageB.insertAdjacentElement('afterend', imageBFilename);
+    }
+    imageBFilename.textContent = problem.image_b;
+    imageBFilename.style.display = 'block';
 
     resultContainer.style.display = 'block';
     nextButton.style.display = 'block';
@@ -580,6 +632,25 @@ function checkAnswer(selectedButton) {
     imageB.alt = `${problem.book} 해설 ${problem.num}`;
     imageB.style.display = 'block';
 
+    // 해설 이미지 파일명 표시 (image_b)
+    const imageBWrapper = imageB.parentElement;
+    imageBWrapper.style.position = 'relative';
+    let imageBFilename = document.getElementById('image-b-filename');
+    if (!imageBFilename) {
+        imageBFilename = document.createElement('small');
+        imageBFilename.id = 'image-b-filename';
+        imageBFilename.style.display = 'block';
+        imageBFilename.style.textAlign = 'center';
+        imageBFilename.style.marginTop = '5px';
+        imageBFilename.style.color = 'grey';
+        imageBFilename.style.padding = '2px 5px';
+        imageBFilename.style.borderRadius = '3px';
+        imageBFilename.style.fontSize = '0.75em';
+        imageB.insertAdjacentElement('afterend', imageBFilename);
+    }
+    imageBFilename.textContent = problem.image_b;
+    imageBFilename.style.display = 'block';
+
     // 버튼 색상 변경
     if (userAnswer !== correctAnswer) {
         // 오답 선택 버튼 강조
@@ -629,7 +700,7 @@ function checkAnswer(selectedButton) {
         // 회독 정보 기록
         recordChapterCompletion(currentUser.uid, currentBookName, currentChapterName);
 
-        setTimeout(() => alert(`'${currentBookName} - ${currentChapterName}'의 모든 문제를 풀이완료 했습니다.`), 100);
+        setTimeout(() => customAlert(`'${currentBookName} - ${currentChapterName}'의 모든 문제를 풀이완료 했습니다.`), 100);
     }
 }
 
@@ -640,7 +711,7 @@ function nextProblem() {
     if (currentProblemIndex < currentBookProblems.length - 1) {
         displayProblem(currentProblemIndex + 1);
     } else {
-        alert("마지막 문제입니다. 첫 문제로 돌아갑니다.");
+        customAlert("마지막 문제입니다. 첫 문제로 돌아갑니다.");
         displayProblem(0);
     }
 }
@@ -650,34 +721,36 @@ function nextProblem() {
  */
 function memorizeProblem() {
     const problem = currentBookProblems[currentProblemIndex];
-    if (confirm("이 문제를 '암기 완료' 처리하시겠습니까?\n앞으로 이 Chapter에서는 출제되지 않습니다.")) {
-        problem.memorized = true;
-        problem.testResult = 'memorized'; // 상태를 'memorized'로 변경
-        problem.solvedAt = Date.now();
+    customConfirm("이 문제를 '암기 완료' 처리하시겠습니까?<br>앞으로 이 Chapter에서는 출제되지 않습니다.", (confirmed) => {
+        if (confirmed) {
+            problem.memorized = true;
+            problem.testResult = 'memorized'; // 상태를 'memorized'로 변경
+            problem.solvedAt = Date.now();
 
-        if (currentUser) saveProgressToFirebase(currentUser.uid);
-        
-        // 현재 문제 목록에서 방금 암기한 문제를 제거합니다.
-        currentBookProblems.splice(currentProblemIndex, 1);
+            if (currentUser) saveProgressToFirebase(currentUser.uid);
+            
+            // 현재 문제 목록에서 방금 암기한 문제를 제거합니다.
+            currentBookProblems.splice(currentProblemIndex, 1);
 
-        // 만약 남은 문제가 없다면, 퀴즈를 종료하고 알림을 표시합니다.
-        if (currentBookProblems.length === 0) {
-            alert("현재 Chapter의 모든 문제를 암기 완료했습니다!");
-            document.getElementById('quiz-section').style.display = 'none';
-            // 퀴즈 종료 후 UI 통계 업데이트
-            selectBook(bookSelect.value); 
-        } else if (currentProblemIndex >= currentBookProblems.length) {
-            // 마지막 문제를 암기 완료한 경우, 첫 문제로 돌아갑니다.
-            currentProblemIndex = 0;
-            displayProblem(currentProblemIndex);
-        } else {
-            // 그 외의 경우, 다음 문제를 표시합니다.
-            displayProblem(currentProblemIndex);
+            // 만약 남은 문제가 없다면, 퀴즈를 종료하고 알림을 표시합니다.
+            if (currentBookProblems.length === 0) {
+                customAlert("현재 Chapter의 모든 문제를 암기 완료했습니다!");
+                document.getElementById('quiz-section').style.display = 'none';
+                // 퀴즈 종료 후 UI 통계 업데이트
+                selectBook(bookSelect.value); 
+            } else if (currentProblemIndex >= currentBookProblems.length) {
+                // 마지막 문제를 암기 완료한 경우, 첫 문제로 돌아갑니다.
+                currentProblemIndex = 0;
+                displayProblem(currentProblemIndex);
+            } else {
+                // 그 외의 경우, 다음 문제를 표시합니다.
+                displayProblem(currentProblemIndex);
+            }
+
+            // 암기 완료 처리 후, 설정 창의 통계 정보도 즉시 업데이트합니다.
+            updateProgressSummary();
         }
-
-        // 암기 완료 처리 후, 설정 창의 통계 정보도 즉시 업데이트합니다.
-        updateProgressSummary();
-    }
+    });
 }
 
 /**
@@ -687,7 +760,7 @@ function prevProblem() {
     if (currentProblemIndex > 0) {
         displayProblem(currentProblemIndex - 1);
     } else {
-        alert("첫 문제입니다.");
+        customAlert("첫 문제입니다.");
     }
 }
 
@@ -714,64 +787,68 @@ function prevChapter() {
  * 9. 현재 Book의 모든 학습 기록 초기화
  */
 function resetCurrentBookScope() {
-    if (!currentUser) {
-        alert("로그인 후 이용해주세요.");
-        return;
-    }
-    const currentBookName = bookSelect.value;
-    if (!currentBookName) {
-        alert("초기화할 Book이 선택되지 않았습니다.");
-        return;
-    }
-
-    if (confirm(`'${currentBookName}' Book의 모든 학습 기록을 초기화하시겠습니까?`)) {
-        quizData.forEach(problem => {
-            if (problem.book === currentBookName) {
-                problem.testResult = null;
-                problem.solvedAt = null;
-                if (includeMemorizedResetCheckbox.checked) {
-                    problem.memorized = false;
-                }
+    customConfirm(`'${bookSelect.value}' Book의 모든 학습 기록을 초기화하시겠습니까?`, (confirmed) => {
+        if (confirmed) {
+            if (!currentUser) {
+                customAlert("로그인 후 이용해주세요.");
+                return;
             }
-        });
+            const currentBookName = bookSelect.value;
+            if (!currentBookName) {
+                customAlert("초기화할 Book이 선택되지 않았습니다.");
+                return;
+            }
 
-        saveProgressToFirebase(currentUser.uid);
-        alert(`'${currentBookName}' Book의 학습 기록이 초기화되었습니다.`);
-        settingsModal.style.display = 'none';
-        selectBook(currentBookName); // UI 새로고침
-        startQuiz(); // 퀴즈 다시 시작
-    }
+            quizData.forEach(problem => {
+                if (problem.book === currentBookName) {
+                    problem.testResult = null;
+                    problem.solvedAt = null;
+                    if (includeMemorizedResetCheckbox.checked) {
+                        problem.memorized = false;
+                    }
+                }
+            });
+
+            saveProgressToFirebase(currentUser.uid);
+            customAlert(`'${currentBookName}' Book의 학습 기록이 초기화되었습니다.`);
+            settingsModal.style.display = 'none';
+            selectBook(currentBookName); // UI 새로고침
+            startQuiz(); // 퀴즈 다시 시작
+        }
+    });
 }
 
 /**
  * 9-1. 현재 Chapter의 학습 기록 초기화
  */
 function resetCurrentBookLearning() {
-    const selectedChapter = chapterSelect.value;
+    customConfirm(`'${bookSelect.value}'의 '${chapterSelect.value}' Chapter 학습 기록을 초기화하시겠습니까?`, (confirmed) => {
+        if (confirmed) {
+            const selectedChapter = chapterSelect.value;
 
-    if (!currentUser || !selectedChapter) {
-        alert("초기화할 Chapter를 선택해주세요.");
-        return;
-    }
-
-    const currentBookName = bookSelect.value;
-    if (confirm(`'${currentBookName}'의 '${selectedChapter}' Chapter 학습 기록을 초기화하시겠습니까?`)) {
-        quizData.forEach(problem => {
-            if (problem.book === currentBookName && problem.chapter === selectedChapter) {
-                problem.testResult = null;
-                problem.solvedAt = null;
-                if (includeMemorizedResetCheckbox.checked) {
-                    problem.memorized = false;
-                }
+            if (!currentUser || !selectedChapter) {
+                customAlert("초기화할 Chapter를 선택해주세요.");
+                return;
             }
-        });
 
-        saveProgressToFirebase(currentUser.uid); // 변경된 데이터 Firebase에 저장
-        settingsModal.style.display = 'none'; // 모달 닫기
-        selectBook(currentBookName); // Chapter 선택 UI 새로고침
-        chapterSelect.value = selectedChapter; // 초기화한 Chapter를 다시 선택
-        startQuiz(false, 0); // 퀴즈를 1번 문제부터 다시 시작
-    }
+            const currentBookName = bookSelect.value;
+            quizData.forEach(problem => {
+                if (problem.book === currentBookName && problem.chapter === selectedChapter) {
+                    problem.testResult = null;
+                    problem.solvedAt = null;
+                    if (includeMemorizedResetCheckbox.checked) {
+                        problem.memorized = false;
+                    }
+                }
+            });
+
+            saveProgressToFirebase(currentUser.uid); // 변경된 데이터 Firebase에 저장
+            settingsModal.style.display = 'none'; // 모달 닫기
+            selectBook(currentBookName); // Chapter 선택 UI 새로고침
+            chapterSelect.value = selectedChapter; // 초기화한 Chapter를 다시 선택
+            startQuiz(false, 0); // 퀴즈를 1번 문제부터 다시 시작
+        }
+    });
 }
 
 /**
@@ -911,6 +988,9 @@ const SWIPE_THRESHOLD = 100;
 
 // 모바일 터치 이벤트
 imageContainer.addEventListener('touchstart', (e) => {
+    if (e.target.id === 'image-a-filename' || e.target.id === 'image-b-filename') {
+        return; // 파일명 영역에서 시작된 터치는 무시
+    }
     startX = e.touches[0].clientX;
 });
 
@@ -923,6 +1003,9 @@ imageContainer.addEventListener('touchend', (e) => {
 let isDragging = false;
 
 imageContainer.addEventListener('mousedown', (e) => {
+    if (e.target.id === 'image-a-filename' || e.target.id === 'image-b-filename') {
+        return; // 파일명 영역에서 시작된 클릭은 무시
+    }
     isDragging = true;
     startX = e.clientX;
     imageContainer.style.cursor = 'grabbing';
@@ -962,4 +1045,79 @@ function handleSwipe() {
     }
     startX = 0;
     endX = 0;
+}
+
+// =========================================================================
+// 🎨 커스텀 팝업 (Modal) 관련 함수
+// =========================================================================
+
+/**
+ * 커스텀 팝업(모달) HTML 요소를 동적으로 생성하고 body에 추가합니다.
+ */
+function createCustomModal() {
+    const overlay = document.createElement('div');
+    overlay.id = 'custom-modal-overlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1001;';
+
+    customModal = document.createElement('div');
+    customModal.id = 'custom-modal';
+    customModal.style.cssText = 'background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: center; max-width: 90%; width: 320px;';
+
+    customModalMessage = document.createElement('p');
+    customModalMessage.id = 'custom-modal-message';
+    customModalMessage.style.cssText = 'margin: 0 0 20px; font-size: 16px; line-height: 1.5;';
+
+    customModalButtons = document.createElement('div');
+    customModalButtons.id = 'custom-modal-buttons';
+
+    customModalOk = document.createElement('button');
+    customModalOk.id = 'custom-modal-ok';
+    customModalOk.textContent = '확인';
+    customModalOk.style.cssText = 'padding: 10px 20px; border: none; border-radius: 5px; background-color: #007bff; color: white; cursor: pointer;';
+
+    customModalConfirm = document.createElement('button');
+    customModalConfirm.id = 'custom-modal-confirm';
+    customModalConfirm.textContent = '확인';
+    customModalConfirm.style.cssText = 'padding: 10px 20px; border: none; border-radius: 5px; background-color: #28a745; color: white; cursor: pointer; margin-right: 10px;';
+
+    customModalCancel = document.createElement('button');
+    customModalCancel.id = 'custom-modal-cancel';
+    customModalCancel.textContent = '취소';
+    customModalCancel.style.cssText = 'padding: 10px 20px; border: none; border-radius: 5px; background-color: #6c757d; color: white; cursor: pointer;';
+
+    customModalButtons.appendChild(customModalOk);
+    customModalButtons.appendChild(customModalConfirm);
+    customModalButtons.appendChild(customModalCancel);
+    customModal.appendChild(customModalMessage);
+    customModal.appendChild(customModalButtons);
+    overlay.appendChild(customModal);
+    document.body.appendChild(overlay);
+}
+
+/**
+ * 커스텀 alert 창을 띄웁니다.
+ * @param {string} message - 표시할 메시지
+ */
+function customAlert(message) {
+    customModalMessage.innerHTML = message.replace(/\n/g, '<br>');
+    customModalOk.style.display = 'inline-block';
+    customModalConfirm.style.display = 'none';
+    customModalCancel.style.display = 'none';
+    document.getElementById('custom-modal-overlay').style.display = 'flex';
+    customModalOk.onclick = () => document.getElementById('custom-modal-overlay').style.display = 'none';
+}
+
+/**
+ * 커스텀 confirm 창을 띄웁니다.
+ * @param {string} message - 표시할 메시지
+ * @param {function} callback - 사용자의 선택(true/false)을 인자로 받는 콜백 함수
+ */
+function customConfirm(message, callback) {
+    customModalMessage.innerHTML = message.replace(/\n/g, '<br>');
+    customModalOk.style.display = 'none';
+    customModalConfirm.style.display = 'inline-block';
+    customModalCancel.style.display = 'inline-block';
+    document.getElementById('custom-modal-overlay').style.display = 'flex';
+    customModalConfirm.onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; callback(true); };
+    customModalCancel.onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; callback(false); };
 }
