@@ -877,9 +877,12 @@ function updateProgressSummary() {
 
     chaptersInSelectedBook.forEach(chapterName => {
         const problemsInChapter = problemsInSelectedBook.filter(p => p.chapter === chapterName);
-        const total = problemsInChapter.length;
-        const solved = problemsInChapter.filter(p => p.testResult !== null).length;
         const memorized = problemsInChapter.filter(p => p.memorized).length;
+
+        // 암기 완료한 문제를 제외하고 계산
+        const problemsToStudy = problemsInChapter.filter(p => !p.memorized);
+        const total = problemsToStudy.length;
+        const solved = problemsToStudy.filter(p => p.testResult !== null).length;
         const progress = total > 0 ? Math.round((solved / total) * 100) : 0;
 
         const progressParagraph = document.createElement('p');
@@ -985,19 +988,33 @@ function updateSolvedProblemsChart() {
 let startX = 0;
 let endX = 0;
 const SWIPE_THRESHOLD = 100; 
+let isMultiTouch = false; // 멀티 터치(확대/축소) 감지용 플래그
 
 // 모바일 터치 이벤트
 imageContainer.addEventListener('touchstart', (e) => {
     if (e.target.id === 'image-a-filename' || e.target.id === 'image-b-filename') {
         return; // 파일명 영역에서 시작된 터치는 무시
     }
-    startX = e.touches[0].clientX;
+    if (e.touches.length > 1) { // 두 개 이상의 터치가 감지되면 멀티 터치로 간주
+        isMultiTouch = true;
+        return; // 스와이프 감지 로직을 건너뜁니다.
+    }
+    // 단일 터치인 경우에만 스와이프 시작 위치 기록
+    startX = e.touches[0].clientX; 
+    isMultiTouch = false; // 단일 터치 시작 시 플래그 초기화
+});
+
+imageContainer.addEventListener('touchmove', (e) => {
+    if (e.touches.length > 1) { // 터치 이동 중 멀티 터치가 감지되면 플래그 설정
+        isMultiTouch = true;
+    }
 });
 
 imageContainer.addEventListener('touchend', (e) => {
     endX = e.changedTouches[0].clientX;
     handleSwipe();
 });
+
 
 // PC 마우스 드래그 이벤트
 let isDragging = false;
