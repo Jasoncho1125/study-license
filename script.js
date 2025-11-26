@@ -200,12 +200,19 @@ async function recordChapterCompletion(userId, bookName, chapterName) {
     const chapterId = `${bookName}-${chapterName}`;
     const chapterProblems = quizData.filter(p => p.book === bookName && p.chapter === chapterName);
     const correctCount = chapterProblems.filter(p => p.testResult === 'ok').length;
+    const memorizedCount = chapterProblems.filter(p => p.memorized).length; // 현재 챕터의 암기 완료 수
     const totalCount = chapterProblems.length;
     
     // Firebase는 배열을 객체로 저장하므로, Object.values를 사용해 길이를 구합니다.
     const currentHistoryArray = completionHistory[chapterId] ? Object.values(completionHistory[chapterId]) : [];
     const newCycleNumber = currentHistoryArray.length + 1;
-    const newHistoryEntry = { cycle: newCycleNumber, correct: correctCount, total: totalCount, completedAt: Date.now() };
+    const newHistoryEntry = { 
+        cycle: newCycleNumber, 
+        correct: correctCount, 
+        total: totalCount, 
+        memorizedCount: memorizedCount, // 회독 완료 시점의 암기 수를 저장
+        completedAt: Date.now() 
+    };
 
     await set(ref(db, `users/${userId}/completionHistory/${chapterId}/${newCycleNumber - 1}`), newHistoryEntry);
 
@@ -894,7 +901,13 @@ function updateProgressSummary() {
         let historyText = '[0회독]';
         if (historyObject) {
             const history = Object.values(historyObject); // 객체를 배열로 변환
-            historyText = '[' + history.map(h => `${h.cycle}회독(${h.correct}/${h.total})`).join(', ') + ']';
+            historyText = '[' + history.map(h => {
+                // 각 회독 완료 시점의 암기 수를 반영하여 총 문제 수 계산
+                // h.memorizedCount가 없으면(이전 버전 데이터) 현재 암기 수를 사용
+                const cycleMemorizedCount = h.memorizedCount !== undefined ? h.memorizedCount : memorized;
+                const cycleTotal = h.total - cycleMemorizedCount;
+                return `${h.cycle}회독(${h.correct}/${cycleTotal > 0 ? cycleTotal : '?'})`;
+            }).join(', ') + ']';
         }
 
         progressParagraph.innerHTML = `${chapterName}: ${solved}/${total} (${progress}%), 암기: ${memorized} ${historyText}`;
@@ -1043,6 +1056,13 @@ imageContainer.addEventListener('mousemove', (e) => {
 });
 
 function handleSwipe() {
+    // 멀티 터치(확대/축소) 중이었다면 스와이프로 간주하지 않고 종료
+    if (isMultiTouch) {
+        startX = 0;
+        endX = 0;
+        isMultiTouch = false;
+        return;
+    }
     if (startX === 0 && endX === 0) return; // 스와이프가 아닌 단순 클릭 방지
 
     const deltaX = endX - startX;
