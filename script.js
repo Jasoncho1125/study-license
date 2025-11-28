@@ -1000,7 +1000,9 @@ function updateSolvedProblemsChart() {
 // =========================================================================
 let startX = 0;
 let endX = 0;
-const SWIPE_THRESHOLD = 100; 
+let startY = 0;
+let endY = 0;
+const SWIPE_THRESHOLD = 120; 
 let isMultiTouch = false; // 멀티 터치(확대/축소) 감지용 플래그
 
 // 모바일 터치 이벤트
@@ -1013,7 +1015,8 @@ imageContainer.addEventListener('touchstart', (e) => {
         return; // 스와이프 감지 로직을 건너뜁니다.
     }
     // 단일 터치인 경우에만 스와이프 시작 위치 기록
-    startX = e.touches[0].clientX; 
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
     isMultiTouch = false; // 단일 터치 시작 시 플래그 초기화
 });
 
@@ -1024,7 +1027,13 @@ imageContainer.addEventListener('touchmove', (e) => {
 });
 
 imageContainer.addEventListener('touchend', (e) => {
+    // 핀치 줌 동작 중이었다면 스와이프 로직을 실행하지 않음
+    if (isMultiTouch) {
+        isMultiTouch = false; // 플래그 초기화
+        return;
+    }
     endX = e.changedTouches[0].clientX;
+    endY = e.changedTouches[0].clientY;
     handleSwipe();
 });
 
@@ -1038,6 +1047,7 @@ imageContainer.addEventListener('mousedown', (e) => {
     }
     isDragging = true;
     startX = e.clientX;
+    startY = e.clientY;
     imageContainer.style.cursor = 'grabbing';
 });
 
@@ -1052,6 +1062,7 @@ document.addEventListener('mouseup', () => {
 imageContainer.addEventListener('mousemove', (e) => {
     if (isDragging) {
         endX = e.clientX;
+        endY = e.clientY;
     }
 });
 
@@ -1066,8 +1077,10 @@ function handleSwipe() {
     if (startX === 0 && endX === 0) return; // 스와이프가 아닌 단순 클릭 방지
 
     const deltaX = endX - startX;
+    const deltaY = endY - startY;
     
-    if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+    // 수평 이동이 수직 이동보다 크고, 스와이프 최소 거리를 넘었을 때만 동작
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
         if (deltaX > 0) {
             // 오른쪽 스와이프 (이전 문제)
             prevProblem();
@@ -1082,6 +1095,8 @@ function handleSwipe() {
     }
     startX = 0;
     endX = 0;
+    startY = 0;
+    endY = 0;
 }
 
 // =========================================================================
