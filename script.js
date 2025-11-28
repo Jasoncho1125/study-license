@@ -69,7 +69,7 @@ const loginIcon = document.getElementById('login-icon');
 const userStatus = document.getElementById('user-status');
 const logoutButton = document.getElementById('logout-button');
 const userDisplayName = document.getElementById('user-display-name');
-const settingsCloseButtonBottom = document.getElementById('settings-close-button-bottom');
+const settingsCloseButtonBottom = document.getElementById('settings-close-button-bottom'); // 이 부분은 HTML에 해당 id가 있는지 확인 필요
 let customModal, customModalMessage, customModalButtons, customModalOk, customModalConfirm, customModalCancel;
 
 // =========================================================================
@@ -97,7 +97,7 @@ chapterSelect.addEventListener('change', () => startQuiz()); // Chapter 선택 �
 bookSelect.addEventListener('change', () => selectBook(bookSelect.value));
 logoutButton.addEventListener('click', handleLogout);
 settingsCloseButtonBottom.addEventListener('click', () => settingsModal.style.display = 'none');
-
+ 
 // =========================================================================
 // 👤 Firebase 인증 관련 함수
 // =========================================================================
@@ -377,6 +377,22 @@ function selectBook(book) {
 }
 
 /**
+ * 현재 챕터의 학습 기록을 초기화하는 함수
+ * @param {boolean} includeMemorized - 암기 완료된 문제도 초기화할지 여부
+ */
+function resetCurrentChapter(includeMemorized) {
+    const selectedChapter = chapterSelect.value;
+    const currentBookName = bookSelect.value;
+    quizData.forEach(problem => {
+        if (problem.book === currentBookName && problem.chapter === selectedChapter) {
+            problem.testResult = null;
+            problem.solvedAt = null;
+            if (includeMemorized) problem.memorized = false;
+        }
+    });
+    if (currentUser) saveProgressToFirebase(currentUser.uid);
+}
+/**
  * 3-1. 선택된 Chapter들의 문제로 퀴즈 시작
  */
 function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
@@ -406,6 +422,26 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
     if (currentBookProblems.length === 0) {
         customAlert("선택하신 Chapter에 문제가 없습니다.");
         return;
+    }
+
+    // 모든 문제를 풀었는지 확인 (암기하지 않은 문제 중에서)
+    const allSolved = currentBookProblems.every(p => p.testResult !== null);
+    if (allSolved) {
+        const content = `
+            <p>현재 Chapter의 모든 문제를 풀이한 상태입니다. 초기화 후 다시 시작 하시겠습니까?</p>
+            <div style="margin-top: 15px; text-align: left;">
+                <input type="checkbox" id="popup-include-memorized-reset" style="margin-right: 5px;">
+                <label for="popup-include-memorized-reset">암기 완료 포함</label>
+            </div>
+        `;
+        customConfirmWithContent(content, (confirmed) => {
+            if (confirmed) {
+                const includeMemorized = document.getElementById('popup-include-memorized-reset').checked;
+                resetCurrentChapter(includeMemorized);
+                startQuiz(false, 0); // 초기화 후 퀴즈 다시 시작
+            }
+        });
+        return; // 팝업이 떴으므로 여기서 함수 종료
     }
 
     // 문제 순서를 uid 기준으로 정렬
@@ -900,14 +936,19 @@ function updateProgressSummary() {
         const historyObject = completionHistory[chapterId];
         let historyText = '[0회독]';
         if (historyObject) {
-            const history = Object.values(historyObject); // 객체를 배열로 변환
-            historyText = '[' + history.map(h => {
-                // 각 회독 완료 시점의 암기 수를 반영하여 총 문제 수 계산
-                // h.memorizedCount가 없으면(이전 버전 데이터) 현재 암기 수를 사용
-                const cycleMemorizedCount = h.memorizedCount !== undefined ? h.memorizedCount : memorized;
-                const cycleTotal = h.total - cycleMemorizedCount;
-                return `${h.cycle}회독(${h.correct}/${cycleTotal > 0 ? cycleTotal : '?'})`;
-            }).join(', ') + ']';
+            const history = Object.values(historyObject).sort((a, b) => a.cycle - b.cycle); // cycle 순서대로 정렬
+            if (history.length > 0) {
+                historyText = '[' + history.map(h => {
+                    // 각 회독 완료 시점의 암기 수를 반영하여 총 문제 수 계산
+                    // h.memorizedCount가 없으면(이전 버전 데이터) 0으로 처리
+                    const cycleMemorizedCount = h.memorizedCount !== undefined ? h.memorizedCount : 0;
+                    // 해당 회독의 총 문제 수는 (전체 문제 수 - 해당 회독까지 누적 암기 수)
+                    const cycleTotal = h.total - cycleMemorizedCount;
+                    return `${h.cycle}회독(${h.correct}/${cycleTotal > 0 ? cycleTotal : '?'})`;
+                }).join(', ') + ']';
+            } else {
+                historyText = '[0회독]';
+            }
         }
 
         progressParagraph.innerHTML = `${chapterName}: ${solved}/${total} (${progress}%), 암기: ${memorized} ${historyText}`;
@@ -1002,7 +1043,7 @@ let startX = 0;
 let endX = 0;
 let startY = 0;
 let endY = 0;
-const SWIPE_THRESHOLD = 120; 
+const SWIPE_THRESHOLD = 150; 
 let isMultiTouch = false; // 멀티 터치(확대/축소) 감지용 플래그
 
 // 모바일 터치 이벤트
@@ -1103,6 +1144,7 @@ function handleSwipe() {
 // 🎨 커스텀 팝업 (Modal) 관련 함수
 // =========================================================================
 
+let customModalContent;
 /**
  * 커스텀 팝업(모달) HTML 요소를 동적으로 생성하고 body에 추가합니다.
  */
@@ -1118,6 +1160,10 @@ function createCustomModal() {
     customModalMessage = document.createElement('p');
     customModalMessage.id = 'custom-modal-message';
     customModalMessage.style.cssText = 'margin: 0 0 20px; font-size: 16px; line-height: 1.5;';
+
+    customModalContent = document.createElement('div');
+    customModalContent.id = 'custom-modal-content';
+    customModalContent.style.cssText = 'margin: 0 0 20px;';
 
     customModalButtons = document.createElement('div');
     customModalButtons.id = 'custom-modal-buttons';
@@ -1141,6 +1187,7 @@ function createCustomModal() {
     customModalButtons.appendChild(customModalConfirm);
     customModalButtons.appendChild(customModalCancel);
     customModal.appendChild(customModalMessage);
+    customModal.appendChild(customModalContent);
     customModal.appendChild(customModalButtons);
     overlay.appendChild(customModal);
     document.body.appendChild(overlay);
@@ -1152,6 +1199,7 @@ function createCustomModal() {
  */
 function customAlert(message) {
     customModalMessage.innerHTML = message.replace(/\n/g, '<br>');
+    customModalContent.innerHTML = ''; // 컨텐츠 영역 비우기
     customModalOk.style.display = 'inline-block';
     customModalConfirm.style.display = 'none';
     customModalCancel.style.display = 'none';
@@ -1166,6 +1214,23 @@ function customAlert(message) {
  */
 function customConfirm(message, callback) {
     customModalMessage.innerHTML = message.replace(/\n/g, '<br>');
+    customModalContent.innerHTML = ''; // 컨텐츠 영역 비우기
+    customModalOk.style.display = 'none';
+    customModalConfirm.style.display = 'inline-block';
+    customModalCancel.style.display = 'inline-block';
+    document.getElementById('custom-modal-overlay').style.display = 'flex';
+    customModalConfirm.onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; callback(true); };
+    customModalCancel.onclick = () => { document.getElementById('custom-modal-overlay').style.display = 'none'; callback(false); };
+}
+
+/**
+ * 커스텀 HTML 컨텐츠를 포함하는 confirm 창을 띄웁니다.
+ * @param {string} htmlContent - 모달에 표시할 HTML 문자열
+ * @param {function} callback - 사용자의 선택(true/false)을 인자로 받는 콜백 함수
+ */
+function customConfirmWithContent(htmlContent, callback) {
+    customModalMessage.innerHTML = ''; // 메시지 영역 비우기
+    customModalContent.innerHTML = htmlContent;
     customModalOk.style.display = 'none';
     customModalConfirm.style.display = 'inline-block';
     customModalCancel.style.display = 'inline-block';
