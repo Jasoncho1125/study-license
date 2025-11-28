@@ -1043,7 +1043,7 @@ let startX = 0;
 let endX = 0;
 let startY = 0;
 let endY = 0;
-const SWIPE_THRESHOLD = 150; 
+const SWIPE_THRESHOLD = 200; 
 let isMultiTouch = false; // 멀티 터치(확대/축소) 감지용 플래그
 
 // 모바일 터치 이벤트
