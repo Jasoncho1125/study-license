@@ -1,9 +1,9 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
-import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH, GEMINI_API_KEY, GEMINI_MODEL_VERSION } from './config.js';
+import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH } from './config.js';
+import { auth, db } from './firebase-config.js';
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
@@ -18,12 +18,6 @@ const firebaseConfig = {
     appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
     measurementId: "G-24Z44XL77C",
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const db = getDatabase(app);
 
 let quizData = []; // 모든 문제 데이터
 let currentBookProblems = []; // 현재 학습할 문제 데이터 (선택된 챕터들의 문제)
@@ -48,8 +42,6 @@ const optionsContainer = document.getElementById('options-container');
 const explanationText = document.getElementById('explanation-text');
 const nextButton = document.getElementById('next-button');
 const memorizeButton = document.getElementById('memorize-button');
-const aiAnalysisButton = document.createElement('button'); // AI 분석 버튼 동적 생성
-const aiResultContainer = document.createElement('div'); // AI 분석 결과 컨테이너
 const chapterSelect = document.getElementById('chapter-select'); // Chapter 드롭다운
 const quizHeader = document.getElementById('quiz-header');
 const currentProblemInfo = document.getElementById('current-problem-info');
@@ -79,22 +71,6 @@ let customModal, customModalMessage, customModalButtons, customModalOk, customMo
 // =========================================================================
 
 // =========================================================================
-// 🎨 UI 요소 동적 생성 및 설정
-// =========================================================================
-function setupDynamicUI() {
-    // AI 분석 버튼 설정
-    aiAnalysisButton.id = 'ai-analysis-button';
-    aiAnalysisButton.textContent = '🤖 AI 분석';
-    aiAnalysisButton.className = 'control-button action-button'; // action-button 클래스 추가
-    aiAnalysisButton.style.display = 'none'; // 기본적으로 숨김
-    memorizeButton.parentNode.insertBefore(aiAnalysisButton, nextButton);
-
-    // AI 결과 컨테이너 설정
-    aiResultContainer.id = 'ai-result-container';
-    aiResultContainer.style.textAlign = 'left'; // AI 분석 결과 왼쪽 정렬
-    explanationText.parentNode.insertBefore(aiResultContainer, explanationText.nextSibling);
-}
-
 // 앱 제목에 버전 표시
 const appTitle = document.querySelector('.app-header h1');
 if (appTitle) {
@@ -102,7 +78,6 @@ if (appTitle) {
 }
 
 document.addEventListener('DOMContentLoaded', createCustomModal);
-document.addEventListener('DOMContentLoaded', setupDynamicUI);
 loginIcon.addEventListener('click', () => window.location.href = 'login.html');
 settingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
 closeModalButton.addEventListener('click', () => settingsModal.style.display = 'none'); 
@@ -112,7 +87,6 @@ prevChapterButton.addEventListener('click', prevChapter);
 nextChapterButton.addEventListener('click', nextChapter);
 nextProblemTopButton.addEventListener('click', nextProblem);
 memorizeButton.addEventListener('click', memorizeProblem);
-aiAnalysisButton.addEventListener('click', getAiAnalysis);
 nextButton.addEventListener('click', nextProblem);
 chapterSelect.addEventListener('change', () => startQuiz()); // Chapter 선택 시 바로 퀴즈 시작
 bookSelect.addEventListener('change', () => selectBook(bookSelect.value));
@@ -127,33 +101,22 @@ settingsCloseButtonBottom.addEventListener('click', () => settingsModal.style.di
  * 로그아웃 처리
  */
 async function handleLogout() {
-    try {
-        await signOut(auth);
-        customAlert('로그아웃 되었습니다.');
-    } catch (error) {
-        console.error("로그아웃 오류:", error);
-        customAlert(`로그아웃 실패: ${error.message}`);
-    }
+    await signOut(auth);
+    window.location.href = 'login.html';
 }
 
 /**
  * 사용자 인증 상태 변경 감지
  * 페이지 로드 시 사용자의 로그인 상태를 확인하고 UI를 업데이트합니다.
  */
-onAuthStateChanged(auth, user => {
-    if (user) {
-        // 사용자가 로그인한 경우 (user 객체가 존재)
-        currentUser = user;
-        userStatus.style.display = 'inline-flex';
-        userDisplayName.textContent = `${user.displayName}님`;
-        loginIcon.style.display = 'none';
-        loadData(currentUser.uid); // 사용자 ID로 데이터 로드
-    } else {
-        // 사용자가 로그아웃한 경우 (user 객체가 null)
-        // 로그인 페이지로 리디렉션
-        window.location.href = 'login.html';
+auth.onAuthStateChanged(user => {
+    currentUser = user;
+    if (currentUser) {
+        // 사용자가 로그인한 경우, 데이터 로드
+        loadData(currentUser.uid);
     }
-});
+    // 로그아웃한 경우의 리디렉션은 auth-check.js에서 처리합니다.
+})
 // =========================================================================
 // 💾 Firebase 데이터베이스 관련 함수
 // =========================================================================
@@ -546,7 +509,6 @@ function displayProblem(index) {
     explanationText.style.display = 'none';
     imageB.style.display = 'none'; // 해설 이미지 숨기기
     nextButton.style.display = 'none';
-    aiAnalysisButton.style.display = 'none';
     memorizeButton.style.display = 'none';
 
     // 해설 이미지 파일명 숨기기
@@ -559,9 +521,6 @@ function displayProblem(index) {
     if (imageBWrapper.style.position === 'relative') {
         // imageA와 imageB가 같은 부모를 공유하므로, 여기서는 제거하지 않습니다.
         // 만약 다른 부모를 가진다면 제거 로직이 필요합니다.
-    }
-    if (aiResultContainer) {
-        aiResultContainer.innerHTML = ''; // AI 분석 결과 초기화
     }
 
     nextProblemTopButton.style.display = 'none';
@@ -641,7 +600,6 @@ function showPreviousResult(problem) {
     resultContainer.style.display = 'block';
     nextButton.style.display = 'block';
     memorizeButton.style.display = 'none'; // 이미 푼 문제는 암기완료 버튼 숨김
-    aiAnalysisButton.style.display = 'block'; // 이미 푼 문제도 AI 분석은 가능하도록
     nextProblemTopButton.style.display = 'block';
 }
 
@@ -677,10 +635,8 @@ function checkAnswer(selectedButton) {
         if (!problem.attemptHistory) problem.attemptHistory = [];
         problem.attemptHistory.push('ok');
         memorizeButton.style.display = 'block';
-        aiAnalysisButton.style.display = 'block';
-        memorizeButton.style.width = '32%';
-        aiAnalysisButton.style.width = '32%';
-        nextButton.style.width = '32%';
+        memorizeButton.style.width = '49%';
+        nextButton.style.width = '49%';
         problem.testResult = 'ok';
     } else {
         message = `틀렸습니다. 정답은 ${correctAnswer.split('').join(', ')}번입니다. 😥`;
@@ -688,8 +644,6 @@ function checkAnswer(selectedButton) {
         if (!problem.attemptHistory) problem.attemptHistory = [];
         problem.attemptHistory.push('nok');
         memorizeButton.style.display = 'none'; // 오답일 때는 암기 완료 버튼 숨김
-        aiAnalysisButton.style.display = 'block'; // 오답일 때도 AI 분석은 가능하도록
-        aiAnalysisButton.style.width = '49%';
         nextButton.style.width = '49%';
         problem.testResult = 'nok';
     }
@@ -829,78 +783,6 @@ function memorizeProblem() {
             updateProgressSummary();
         }
     });
-}
-
-/**
- * 7-2. AI(Gemini)를 이용한 문제 분석 요청
- */
-async function getAiAnalysis() {
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
-        customAlert("AI 분석 기능을 사용하려면<br>config.js 파일에 Gemini API 키를 설정해야 합니다.");
-        return;
-    }
-
-    const problem = currentBookProblems[currentProblemIndex];
-    const { license, book, image_a } = problem;
-
-    aiAnalysisButton.disabled = true;
-    aiAnalysisButton.textContent = '🤖 분석 중...';
-    aiResultContainer.innerHTML = '<p>AI가 문제를 분석하고 있습니다. 잠시만 기다려주세요...</p>';
-
-    try {
-        // Promise를 사용하여 이미지 인코딩과 API 호출을 순차적으로 실행
-        const { base64Image, mimeType } = await new Promise((resolve, reject) => {
-            const imageUrl = IMAGE_BASE_PATH + image_a;
-            fetch(imageUrl)
-                .then(response => response.blob())
-                .then(blob => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = () => {
-                        resolve({
-                            base64Image: reader.result.split(',')[1],
-                            mimeType: blob.type
-                        });
-                    };
-                    reader.onerror = (error) => reject(new Error("이미지 파일을 읽는 데 실패했습니다."));
-                })
-                .catch(error => reject(new Error("이미지 파일을 가져오는 데 실패했습니다.")));
-        });
-
-        const prompt = `이 문제는 ${license}의 ${book} 과목에 나오는 문제이다. 풀이 과정을 상세하게 설명해줘.`;
-
-        const requestBody = {
-            contents: [{
-                parts: [
-                    { text: prompt },
-                    { inline_data: { mime_type: mimeType, data: base64Image } }
-                ]
-            }]
-        };
-
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_VERSION}:generateContent?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!geminiResponse.ok) {
-            const errorBody = await geminiResponse.json();
-            console.error("Gemini API Error Body:", errorBody);
-            throw new Error(`Gemini API 오류: ${geminiResponse.statusText} - ${errorBody.error?.message || '응답을 확인하세요.'}`);
-        }
-
-        const data = await geminiResponse.json();
-        const aiText = data.candidates[0].content.parts[0].text;
-        aiResultContainer.innerHTML = `<h3>🤖 AI 분석 결과</h3><p>${aiText.replace(/\n/g, '<br>')}</p>`;
-
-    } catch (error) {
-        console.error("AI 분석 오류:", error);
-        aiResultContainer.innerHTML = `<p style="color: red;">❌ AI 분석 중 오류가 발생했습니다: ${error.message}</p>`;
-    } finally {
-        aiAnalysisButton.disabled = false;
-        aiAnalysisButton.textContent = '🤖 AI 분석';
-    }
 }
 
 /**
