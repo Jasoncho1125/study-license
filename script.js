@@ -1,9 +1,9 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
-import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH } from './config.js';
+import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH, GEMINI_API_KEY, GEMINI_MODEL_VERSION } from './config.js';
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
@@ -48,6 +48,8 @@ const optionsContainer = document.getElementById('options-container');
 const explanationText = document.getElementById('explanation-text');
 const nextButton = document.getElementById('next-button');
 const memorizeButton = document.getElementById('memorize-button');
+const aiAnalysisButton = document.createElement('button'); // AI 분석 버튼 동적 생성
+const aiResultContainer = document.createElement('div'); // AI 분석 결과 컨테이너
 const chapterSelect = document.getElementById('chapter-select'); // Chapter 드롭다운
 const quizHeader = document.getElementById('quiz-header');
 const currentProblemInfo = document.getElementById('current-problem-info');
@@ -76,6 +78,23 @@ let customModal, customModalMessage, customModalButtons, customModalOk, customMo
 // 🚀 초기화 및 이벤트 리스너
 // =========================================================================
 
+// =========================================================================
+// 🎨 UI 요소 동적 생성 및 설정
+// =========================================================================
+function setupDynamicUI() {
+    // AI 분석 버튼 설정
+    aiAnalysisButton.id = 'ai-analysis-button';
+    aiAnalysisButton.textContent = '🤖 AI 분석';
+    aiAnalysisButton.className = 'control-button action-button'; // action-button 클래스 추가
+    aiAnalysisButton.style.display = 'none'; // 기본적으로 숨김
+    memorizeButton.parentNode.insertBefore(aiAnalysisButton, nextButton);
+
+    // AI 결과 컨테이너 설정
+    aiResultContainer.id = 'ai-result-container';
+    aiResultContainer.style.textAlign = 'left'; // AI 분석 결과 왼쪽 정렬
+    explanationText.parentNode.insertBefore(aiResultContainer, explanationText.nextSibling);
+}
+
 // 앱 제목에 버전 표시
 const appTitle = document.querySelector('.app-header h1');
 if (appTitle) {
@@ -83,6 +102,7 @@ if (appTitle) {
 }
 
 document.addEventListener('DOMContentLoaded', createCustomModal);
+document.addEventListener('DOMContentLoaded', setupDynamicUI);
 loginIcon.addEventListener('click', () => window.location.href = 'login.html');
 settingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
 closeModalButton.addEventListener('click', () => settingsModal.style.display = 'none'); 
@@ -92,6 +112,7 @@ prevChapterButton.addEventListener('click', prevChapter);
 nextChapterButton.addEventListener('click', nextChapter);
 nextProblemTopButton.addEventListener('click', nextProblem);
 memorizeButton.addEventListener('click', memorizeProblem);
+aiAnalysisButton.addEventListener('click', getAiAnalysis);
 nextButton.addEventListener('click', nextProblem);
 chapterSelect.addEventListener('change', () => startQuiz()); // Chapter 선택 시 바로 퀴즈 시작
 bookSelect.addEventListener('change', () => selectBook(bookSelect.value));
@@ -260,28 +281,29 @@ async function loadData(userId) {
 
         document.getElementById('progress-summary-section').style.display = 'block';
         
-        // JSON 데이터를 기본 템플릿으로 설정
-        let mergedData = remoteData.map(problem => ({
-            ...problem,
-            testResult: null, // 기본값 초기화,
-            attemptHistory: [],
-            memorized: false,
-            solvedAt: null    // 시간 정보 필드 추가
-        }));
-
-        // Firebase 데이터와 병합
+        // 사용자 진행 상황을 Map으로 변환하여 빠른 조회를 가능하게 함
+        let userProgressMap = new Map();
         if (userData && userData.progress) {
-            const userProgressMap = new Map(userData.progress.map(p => [p.uid, { result: p.testResult, time: p.solvedAt, memorized: p.memorized, attemptHistory: p.attemptHistory }]));
-            mergedData.forEach(problem => {
-                if (userProgressMap.has(problem.uid)) {
-                    const progress = userProgressMap.get(problem.uid);
-                    problem.testResult = progress.result;
-                    problem.attemptHistory = progress.attemptHistory || [];
-                    problem.memorized = progress.memorized || false;
-                    problem.solvedAt = progress.time;
-                }
-            });
+            userProgressMap = new Map(userData.progress.map(p => [p.uid, p]));
         }
+
+        // JSON 데이터를 기반으로, 사용자 진행 상황을 병합
+        const mergedData = remoteData.map(problem => {
+            const userProgress = userProgressMap.get(problem.uid);
+            if (userProgress) {
+                // 사용자가 푼 기록이 있으면, 해당 기록을 문제 데이터에 합침
+                return { ...problem, ...userProgress };
+            } else {
+                // 푼 기록이 없으면, 기본값으로 초기화
+                return {
+                    ...problem,
+                    testResult: null,
+                    attemptHistory: [],
+                    memorized: false,
+                    solvedAt: null
+                };
+            }
+        });
         
         quizData = mergedData;
         
@@ -416,6 +438,9 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
     // 현재 챕터 인덱스 업데이트
     currentChapterIndex = chapterList.indexOf(selectedChapter);
 
+    // 학습 현황 UI를 업데이트하여 현재 챕터를 강조 표시
+    updateProgressSummary();
+
     const selectedBook = bookSelect.value;
     currentBookProblems = quizData.filter(p => p.book === selectedBook && p.chapter === selectedChapter && !p.memorized);
 
@@ -428,7 +453,7 @@ function startQuiz(fromNav = false, startIndex = null, fromBookChange = false) {
     const allSolved = currentBookProblems.every(p => p.testResult !== null);
     if (allSolved) {
         const content = `
-            <p>현재 Chapter의 모든 문제를 풀이한 상태입니다. 초기화 후 다시 시작 하시겠습니까?</p>
+            <p>선택한 Chapter의 모든 문제를 풀이한 상태입니다. 초기화 후 다시 시작 하시겠습니까?</p>
             <div style="margin-top: 15px; text-align: left;">
                 <input type="checkbox" id="popup-include-memorized-reset" style="margin-right: 5px;">
                 <label for="popup-include-memorized-reset">암기 완료 포함</label>
@@ -521,6 +546,7 @@ function displayProblem(index) {
     explanationText.style.display = 'none';
     imageB.style.display = 'none'; // 해설 이미지 숨기기
     nextButton.style.display = 'none';
+    aiAnalysisButton.style.display = 'none';
     memorizeButton.style.display = 'none';
 
     // 해설 이미지 파일명 숨기기
@@ -533,6 +559,9 @@ function displayProblem(index) {
     if (imageBWrapper.style.position === 'relative') {
         // imageA와 imageB가 같은 부모를 공유하므로, 여기서는 제거하지 않습니다.
         // 만약 다른 부모를 가진다면 제거 로직이 필요합니다.
+    }
+    if (aiResultContainer) {
+        aiResultContainer.innerHTML = ''; // AI 분석 결과 초기화
     }
 
     nextProblemTopButton.style.display = 'none';
@@ -612,6 +641,7 @@ function showPreviousResult(problem) {
     resultContainer.style.display = 'block';
     nextButton.style.display = 'block';
     memorizeButton.style.display = 'none'; // 이미 푼 문제는 암기완료 버튼 숨김
+    aiAnalysisButton.style.display = 'block'; // 이미 푼 문제도 AI 분석은 가능하도록
     nextProblemTopButton.style.display = 'block';
 }
 
@@ -647,7 +677,10 @@ function checkAnswer(selectedButton) {
         if (!problem.attemptHistory) problem.attemptHistory = [];
         problem.attemptHistory.push('ok');
         memorizeButton.style.display = 'block';
-        nextButton.style.width = '49%'; // 원래 너비로
+        aiAnalysisButton.style.display = 'block';
+        memorizeButton.style.width = '32%';
+        aiAnalysisButton.style.width = '32%';
+        nextButton.style.width = '32%';
         problem.testResult = 'ok';
     } else {
         message = `틀렸습니다. 정답은 ${correctAnswer.split('').join(', ')}번입니다. 😥`;
@@ -655,7 +688,9 @@ function checkAnswer(selectedButton) {
         if (!problem.attemptHistory) problem.attemptHistory = [];
         problem.attemptHistory.push('nok');
         memorizeButton.style.display = 'none'; // 오답일 때는 암기 완료 버튼 숨김
-        nextButton.style.width = '100%'; // 전체 너비로
+        aiAnalysisButton.style.display = 'block'; // 오답일 때도 AI 분석은 가능하도록
+        aiAnalysisButton.style.width = '49%';
+        nextButton.style.width = '49%';
         problem.testResult = 'nok';
     }
 
@@ -797,6 +832,78 @@ function memorizeProblem() {
 }
 
 /**
+ * 7-2. AI(Gemini)를 이용한 문제 분석 요청
+ */
+async function getAiAnalysis() {
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
+        customAlert("AI 분석 기능을 사용하려면<br>config.js 파일에 Gemini API 키를 설정해야 합니다.");
+        return;
+    }
+
+    const problem = currentBookProblems[currentProblemIndex];
+    const { license, book, image_a } = problem;
+
+    aiAnalysisButton.disabled = true;
+    aiAnalysisButton.textContent = '🤖 분석 중...';
+    aiResultContainer.innerHTML = '<p>AI가 문제를 분석하고 있습니다. 잠시만 기다려주세요...</p>';
+
+    try {
+        // Promise를 사용하여 이미지 인코딩과 API 호출을 순차적으로 실행
+        const { base64Image, mimeType } = await new Promise((resolve, reject) => {
+            const imageUrl = IMAGE_BASE_PATH + image_a;
+            fetch(imageUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        resolve({
+                            base64Image: reader.result.split(',')[1],
+                            mimeType: blob.type
+                        });
+                    };
+                    reader.onerror = (error) => reject(new Error("이미지 파일을 읽는 데 실패했습니다."));
+                })
+                .catch(error => reject(new Error("이미지 파일을 가져오는 데 실패했습니다.")));
+        });
+
+        const prompt = `이 문제는 ${license}의 ${book} 과목에 나오는 문제이다. 풀이 과정을 상세하게 설명해줘.`;
+
+        const requestBody = {
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    { inline_data: { mime_type: mimeType, data: base64Image } }
+                ]
+            }]
+        };
+
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_VERSION}:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!geminiResponse.ok) {
+            const errorBody = await geminiResponse.json();
+            console.error("Gemini API Error Body:", errorBody);
+            throw new Error(`Gemini API 오류: ${geminiResponse.statusText} - ${errorBody.error?.message || '응답을 확인하세요.'}`);
+        }
+
+        const data = await geminiResponse.json();
+        const aiText = data.candidates[0].content.parts[0].text;
+        aiResultContainer.innerHTML = `<h3>🤖 AI 분석 결과</h3><p>${aiText.replace(/\n/g, '<br>')}</p>`;
+
+    } catch (error) {
+        console.error("AI 분석 오류:", error);
+        aiResultContainer.innerHTML = `<p style="color: red;">❌ AI 분석 중 오류가 발생했습니다: ${error.message}</p>`;
+    } finally {
+        aiAnalysisButton.disabled = false;
+        aiAnalysisButton.textContent = '🤖 AI 분석';
+    }
+}
+
+/**
  * 8. 이전 문제로 이동
  */
 function prevProblem() {
@@ -869,7 +976,7 @@ function resetCurrentBookLearning() {
         if (confirmed) {
             const selectedChapter = chapterSelect.value;
 
-            if (!currentUser || !selectedChapter) {
+            if (!currentUser || !selectedChapter) { 
                 customAlert("초기화할 Chapter를 선택해주세요.");
                 return;
             }
@@ -879,7 +986,7 @@ function resetCurrentBookLearning() {
                 if (problem.book === currentBookName && problem.chapter === selectedChapter) {
                     problem.testResult = null;
                     problem.solvedAt = null;
-                    if (includeMemorizedResetCheckbox.checked) {
+                    if (includeMemorizedResetCheckbox.checked) { // 설정 창의 체크박스를 참조
                         problem.memorized = false;
                     }
                 }
