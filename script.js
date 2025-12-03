@@ -1,23 +1,9 @@
 // Import the functions you need from the SDKs you need
-import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 import { APP_NAME, APP_VERSION, JSON_FILE_NAME, IMAGE_BASE_PATH } from './config.js';
 import { auth, db } from './firebase-config.js';
 // https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-    apiKey: "AIzaSyBWSckI_CyRmXxM-UJSmvECb6X2NK1FU4w",
-    authDomain: "study-licnese.firebaseapp.com",
-    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "study-licnese",
-    storageBucket: "study-licnese.firebasestorage.app",
-    messagingSenderId: "382526383688",
-    appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
-    measurementId: "G-24Z44XL77C",
-};
 
 let quizData = []; // 모든 문제 데이터
 let currentBookProblems = []; // 현재 학습할 문제 데이터 (선택된 챕터들의 문제)
@@ -109,14 +95,15 @@ async function handleLogout() {
  * 사용자 인증 상태 변경 감지
  * 페이지 로드 시 사용자의 로그인 상태를 확인하고 UI를 업데이트합니다.
  */
-auth.onAuthStateChanged(user => {
-    currentUser = user;
-    if (currentUser) {
+onAuthStateChanged(auth, user => {
+    if (user) {
         // 사용자가 로그인한 경우, 데이터 로드
-        loadData(currentUser.uid);
+        currentUser = user;
+        loadData(user.uid);
+        // UI 업데이트는 auth-check.js에서 처리
     }
-    // 로그아웃한 경우의 리디렉션은 auth-check.js에서 처리합니다.
-})
+    // 로그아웃 시 리디렉션은 auth-check.js에서 처리
+});
 // =========================================================================
 // 💾 Firebase 데이터베이스 관련 함수
 // =========================================================================

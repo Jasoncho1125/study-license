@@ -1,24 +1,7 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+import { createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+import { ref, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 import { APP_NAME } from './config.js';
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyBWSckI_CyRmXxM-UJSmvECb6X2NK1FU4w",
-    authDomain: "study-licnese.firebaseapp.com",
-    databaseURL: "https://study-licnese-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "study-licnese",
-    storageBucket: "study-licnese.firebasestorage.app",
-    messagingSenderId: "382526383688",
-    appId: "1:382526383688:web:4b23bc787f6ffbc3aa1a7d",
-    measurementId: "G-24Z44XL77C"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
+import { auth, db } from './firebase-config.js';
 
 // 앱 제목 설정
 const authAppTitle = document.querySelector('.auth-box h1');
@@ -114,10 +97,10 @@ if (loginButton) {
 
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // 로그인 성공 시 onAuthStateChanged가 감지하여 index.html로 보내주므로, 여기서는 별도 이동 처리가 필요 없습니다.
             // 성공 알림 후 메인 페이지로 이동합니다.
             alert('로그인 되었습니다.');
-            window.location.href = 'index.html';
+            // auth-check.js가 index.html로 리디렉션할 것이므로 여기서는 페이지 이동 코드를 제거해도 됩니다.
+            // window.location.href = 'index.html'; 
         } catch (error) {
             console.error("Login Error:", error.code);
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
