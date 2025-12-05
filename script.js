@@ -637,7 +637,7 @@ function checkAnswer(selectedButton) {
         if (!problem.attemptHistory) problem.attemptHistory = [];
         problem.attemptHistory.push('nok');
         memorizeButton.style.display = 'none'; // 오답일 때는 암기 완료 버튼 숨김
-        nextButton.style.width = '49%';
+        nextButton.style.width = '100%';
         problem.testResult = 'nok';
     }
 
@@ -1177,17 +1177,24 @@ imageContainer.addEventListener('mousedown', (e) => {
     if (e.target.id === 'image-a-filename' || e.target.id === 'image-b-filename') {
         return; // 파일명 영역에서 시작된 클릭은 무시
     }
-    isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    imageContainer.style.cursor = 'grabbing';
+    // 💡 [수정] 마우스 좌클릭(e.button === 0)일 때만 드래그 시작
+    if (e.button === 0) { 
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        imageContainer.style.cursor = 'grabbing';
+    }
 });
 
-document.addEventListener('mouseup', () => {
+document.addEventListener('mouseup', (e) => { // 💡 [수정] e 인자 추가
     if (isDragging) {
         isDragging = false;
         imageContainer.style.cursor = 'grab';
-        handleSwipe();
+        
+        // 💡 [수정] 마우스 왼쪽 버튼(e.button === 0)을 놓았을 때만 스와이프 처리
+        if (e.button === 0) { 
+            handleSwipe();
+        }
     }
 });
 
