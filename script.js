@@ -598,9 +598,8 @@ function showPreviousResult(problem) {
 optionsContainer.addEventListener('click', (event) => {
     if (isAnswered) return;
 
-    if (event.target.id === 'dont-know-button') {
-        handleDontKnow();
-    } else if (event.target.classList.contains('option-button')) {
+    if (event.target.classList.contains('option-button')) {
+        // '모름' 버튼을 포함한 모든 옵션 버튼은 여기서 처리됩니다.
         checkAnswer(event.target);
     }
 });
@@ -729,71 +728,6 @@ function checkAnswer(selectedButton) {
     }
 }
 
-/**
- * 6-1. '모름' 버튼 처리 로직
- */
-function handleDontKnow() {
-    if (isAnswered) return;
-    isAnswered = true;
-
-    const problem = currentBookProblems[currentProblemIndex];
-    const correctAnswer = problem.answer.toString();
-
-    // '모름'은 항상 오답 처리
-    problem.testResult = 'nok';
-    problem.solvedAt = Date.now();
-    if (!problem.attemptHistory) problem.attemptHistory = [];
-    problem.attemptHistory.push('nok');
-
-    // 모든 선택 버튼 비활성화
-    document.querySelectorAll('.option-button, #dont-know-button').forEach(button => {
-        button.disabled = true;
-    });
-
-    // '모름' 버튼을 선택했음을 시각적으로 표시 (예: 빨간색)
-    document.getElementById('dont-know-button').style.backgroundColor = 'red';
-
-    // 실제 정답 버튼을 파란색으로 표시
-    correctAnswer.split('').forEach(ans => {
-        const correctBtn = document.querySelector(`.option-button[data-option="${ans}"]`);
-        if (correctBtn) correctBtn.style.backgroundColor = '#007bff';
-    });
-
-    // 결과 메시지 표시
-    resultMessage.className = 'incorrect';
-    resultMessage.textContent = `정답은 ${correctAnswer.split('').join(', ')}번입니다. 😥`;
-    resultContainer.style.display = 'block';
-
-    // 해설 표시
-    if (problem.explain) {
-        explanationText.innerHTML = problem.explain.replace(/\n/g, '<br>');
-        explanationText.style.display = 'block';
-    } else {
-        explanationText.style.display = 'none';
-    }
-
-    // 해설 이미지 표시
-    imageB.src = IMAGE_BASE_PATH + problem.image_b;
-    imageB.alt = `${problem.book} 해설 ${problem.num}`;
-    imageB.style.display = 'block';
-
-    // 하단 버튼들 표시
-    nextButton.style.display = 'block';
-    nextButton.style.width = '100%'; // '모름' 선택 시 '다음' 버튼이 전체 너비를 차지하도록
-    memorizeButton.style.display = 'none';
-    nextProblemTopButton.style.display = 'block';
-
-    // Firebase에 결과 저장
-    if (currentUser) saveProgressToFirebase(currentUser.uid);
-
-    // UI 업데이트
-    updateProblemInfo();
-    updateProgressSummary();
-    updateSolvedProblemsChart();
-
-    // 모든 문제를 풀었는지 확인
-    checkChapterCompletion();
-}
 
 /**
  * 7. 다음 문제로 이동
